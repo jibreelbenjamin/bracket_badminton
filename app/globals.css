@@ -1,0 +1,236 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-court-900: #0b332c;
+  --color-court-800: #124a40;
+  --color-court-700: #185f52;
+  --color-court-600: #1f7666;
+  --color-court-500: #278d7a;
+  --color-court-200: #bfe0d8;
+  --color-court-100: #dbeee9;
+  --color-court-50: #f2f9f7;
+
+  --color-cork-600: #9c6708;
+  --color-cork-500: #b5790a;
+  --color-cork-400: #d1930f;
+  --color-cork-100: #fdecc4;
+
+  --color-ink-900: #16221f;
+  --color-ink-700: #34433f;
+  --color-ink-500: #5b6b67;
+  --color-ink-300: #93a29d;
+
+  /* ---- Token shadcn/ui, dipetakan ke palet court/ink/cork di atas ---- */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: #ffffff;
+  --foreground: var(--color-ink-900);
+  --primary: var(--color-court-700);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-court-100);
+  --secondary-foreground: var(--color-court-800);
+  --muted: var(--color-court-50);
+  --muted-foreground: var(--color-ink-500);
+  --accent: var(--color-court-100);
+  --accent-foreground: var(--color-court-800);
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: var(--color-court-200);
+  --input: var(--color-court-200);
+  --ring: var(--color-court-600);
+}
+
+html,
+body {
+  background: var(--color-court-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* =========================================================
+   Bagan turnamen (bracket) — posisi absolut dihitung presisi
+   di komponen React agar garis konektor selalu tepat di
+   tengah setiap kotak pertandingan, di babak manapun.
+   ========================================================= */
+
+.bracket-export {
+  background: #ffffff;
+  display: inline-flex;
+  align-items: flex-start;
+  padding: 36px 44px;
+  border-radius: 24px;
+}
+
+.bracket-round {
+  position: relative;
+  flex: none;
+}
+
+.round-header {
+  text-align: center;
+  margin-bottom: 20px;
+  width: 220px;
+}
+
+.round-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-court-800);
+}
+
+.round-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-cork-500);
+  background: var(--color-cork-100);
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.round-body {
+  position: relative;
+}
+
+.match-box {
+  position: absolute;
+  left: 0;
+  width: 220px;
+  height: 84px;
+  background: var(--color-court-50);
+  border: 1.5px solid var(--color-court-100);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.match-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-court-700);
+  background: var(--color-court-100);
+  padding: 3px 10px;
+  text-align: center;
+  letter-spacing: 0.02em;
+  height: 18px;
+  line-height: 12px;
+}
+
+.player-row {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  height: 33px;
+  padding: 0 12px;
+  border-top: 1px solid var(--color-court-100);
+  border-left: none;
+  text-align: left;
+  background: transparent;
+}
+
+button.player-row {
+  cursor: pointer;
+}
+
+button.player-row:disabled {
+  cursor: default;
+}
+
+button.player-row:not(:disabled):hover {
+  background: var(--color-court-100);
+}
+
+.player-name,
+.player-club {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-ink-900);
+}
+
+.player-club {
+  font-size: 10px;
+  color: var(--color-ink-500);
+}
+
+.player-row.winner {
+  background: var(--color-cork-100);
+}
+
+.player-row.winner .player-name {
+  color: var(--color-court-800);
+}
+
+.player-row.winner .player-name::after {
+  content: " \2713";
+  color: var(--color-cork-500);
+}
+
+.player-row.bye .player-name {
+  color: var(--color-ink-500);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-size: 10.5px;
+}
+
+.connector {
+  position: absolute;
+  left: 220px;
+  width: 40px;
+  border-top: 2px solid var(--color-court-200);
+  border-bottom: 2px solid var(--color-court-200);
+  border-right: 2px solid var(--color-court-200);
+  border-radius: 0 8px 8px 0;
+  pointer-events: none;
+}
+
+.champion-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-court-800);
+}

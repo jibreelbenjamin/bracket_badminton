@@ -1,0 +1,82 @@
+-- =========================================================
+-- Skema database untuk aplikasi Bracket Badminton
+-- Jalankan seluruh file ini di Supabase Dashboard -> SQL Editor
+-- =========================================================
+
+create extension if not exists "pgcrypto";
+
+-- ---------------------------------------------------------
+-- app_settings: satu baris konfigurasi aplikasi (PIN, default durasi)
+-- ---------------------------------------------------------
+create table if not exists app_settings (
+  id int primary key default 1,
+  pin text not null default '8888',
+  default_match_duration_minutes int not null default 20,
+  default_rest_duration_minutes int not null default 15,
+  updated_at timestamptz not null default now(),
+  constraint app_settings_single_row check (id = 1)
+);
+
+insert into app_settings (id, pin)
+values (1, '8888')
+on conflict (id) do nothing;
+
+-- ---------------------------------------------------------
+-- brackets: satu turnamen/bagan
+-- ---------------------------------------------------------
+create table if not exists brackets (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  start_time timestamptz not null,
+  match_duration_minutes int not null default 20,
+  rest_duration_minutes int not null default 15,
+  status text not null default 'draft', -- draft | generated
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
+-- participants: peserta dalam sebuah bracket
+-- ---------------------------------------------------------
+create table if not exists participants (
+  id uuid primary key default gen_random_uuid(),
+  bracket_id uuid not null references brackets(id) on delete cascade,
+  name text not null,
+  club_name text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists participants_bracket_id_idx on participants(bracket_id);
+
+-- ---------------------------------------------------------
+-- matches: setiap kotak pertandingan di bagan
+-- ---------------------------------------------------------
+create table if not exists matches (
+  id uuid primary key default gen_random_uuid(),
+  bracket_id uuid not null references brackets(id) on delete cascade,
+  round_number int not null,
+  match_index int not null,
+  participant1_id uuid references participants(id) on delete set null,
+  participant2_id uuid references participants(id) on delete set null,
+  participant1_is_bye boolean not null default false,
+  participant2_is_bye boolean not null default false,
+  winner_id uuid references participants(id) on delete set null,
+  start_time timestamptz,
+  end_time timestamptz,
+  created_at timestamptz not null default now(),
+  unique (bracket_id, round_number, match_index)
+);
+
+create index if not exists matches_bracket_id_idx on matches(bracket_id);
+
+-- ---------------------------------------------------------
+-- Row Level Security
+-- Aplikasi ini TIDAK memakai Supabase Auth / anon key di browser.
+-- Semua akses dilakukan lewat server (Next.js Server Actions) memakai
+-- SERVICE ROLE KEY, yang otomatis melewati RLS. Maka RLS diaktifkan
+-- tanpa policy sama sekali, supaya key publik (anon) tidak bisa
+-- membaca/menulis apa pun jika suatu saat tidak sengaja terekspos.
+-- ---------------------------------------------------------
+alter table app_settings enable row level security;
+alter table brackets enable row level security;
+alter table participants enable row level security;
+alter table matches enable row level security;
