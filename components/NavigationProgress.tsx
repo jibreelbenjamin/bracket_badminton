@@ -14,17 +14,17 @@ export default function NavigationProgress() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = useCallback(() => {
     setLoading(true);
-    clearTimeout(hideTimerRef.current);
+    if (hideTimerRef.current !== null) clearTimeout(hideTimerRef.current);
     // fallback: sembunyikan setelah 3 detik kalau pathname tidak berubah
     hideTimerRef.current = setTimeout(() => setLoading(false), 3000);
   }, []);
 
   const hide = useCallback(() => {
-    clearTimeout(hideTimerRef.current);
+    if (hideTimerRef.current !== null) clearTimeout(hideTimerRef.current);
     setLoading(false);
   }, []);
 
