@@ -1,4 +1,4 @@
-import type { Bracket, MatchInsert, Participant } from "@/lib/types";
+import type { Bracket, BreakTime, MatchInsert, Participant } from "@/lib/types";
 
 /** Bilangan pangkat 2 terkecil yang >= n (minimal 2). */
 export function nextPowerOfTwo(n: number): number {
@@ -121,15 +121,82 @@ function repairCollisions(input: Slot[]): Slot[] {
 export type RoundSchedule = { round: number; start: Date; end: Date };
 
 /**
+ * Parse HH:mm string ke menit sejak tengah malam (0-1439).
+ */
+function timeStrToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Cek apakah sebuah titik waktu (Date) berada di dalam rentang break_time
+ * tertentu (berdasarkan jam-menit dalam sehari). Jika ya, kembalikan Date
+ * baru yang sudah maju ke akhir break_time tersebut. Jika tidak, kembalikan
+ * Date asli.
+ */
+function skipBreakIfInside(cursor: Date, breaks: { startMin: number; endMin: number }[]): Date {
+  const cursorMin = cursor.getHours() * 60 + cursor.getMinutes();
+  for (const b of breaks) {
+    if (cursorMin >= b.startMin && cursorMin < b.endMin) {
+      // Maju ke akhir break
+      const newDate = new Date(cursor);
+      newDate.setHours(Math.floor(b.endMin / 60), b.endMin % 60, 0, 0);
+      return newDate;
+    }
+  }
+  return cursor;
+}
+
+/**
+ * Cek apakah rentang [start, end] (dalam menit) tumpang-tindih dengan
+ * break time. Jika ya, kembalikan start baru (setelah break). Asumsi:
+ * satu bentrokan saja ditangani per panggilan — pemanggil akan
+ * memanggil ulang sampai tidak ada bentrokan.
+ */
+function avoidBreakOverlap(
+  startDate: Date,
+  durationMinutes: number,
+  breaks: { startMin: number; endMin: number }[]
+): Date {
+  const startMin = startDate.getHours() * 60 + startDate.getMinutes();
+  const endMin = startMin + durationMinutes;
+
+  for (const b of breaks) {
+    // Apakah rentang pertandingan tumpang-tindih dengan break?
+    if (startMin < b.endMin && endMin > b.startMin) {
+      // Mulai pertandingan setelah break selesai
+      const newDate = new Date(startDate);
+      newDate.setHours(Math.floor(b.endMin / 60), b.endMin % 60, 0, 0);
+      return newDate;
+    }
+  }
+  return startDate;
+}
+
+/**
  * Menghitung rentang jam (mulai - selesai) untuk setiap babak berdasarkan
- * jam mulai turnamen, durasi pertandingan per babak, dan waktu istirahat
- * di antara babak. Dihitung langsung di awal (bukan menunggu hasil
- * pertandingan sebelumnya selesai).
+ * jam mulai turnamen, durasi pertandingan per babak, waktu istirahat,
+ * jumlah lapangan, dan daftar waktu istirahat khusus (break_times seperti
+ * waktu sholat).
+ *
+ * Dengan N lapangan, setiap babak dibagi menjadi beberapa "gelombang"
+ * (wave). Misal babak 1 punya 6 pertandingan dan hanya 3 lapangan, maka
+ * ada 2 gelombang: 3 pertandingan jalan bersamaan, lalu istirahat, lalu
+ * 3 pertandingan berikutnya.
+ *
+ * Durasi satu babak = waves × match_duration + (waves−1) × rest_duration
  */
 export function computeRoundSchedule(
-  bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes">,
-  totalRounds: number
+  bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes" | "courts_count">,
+  totalRounds: number,
+  bracketSize: number,
+  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = []
 ): RoundSchedule[] {
+  const breaks = breakTimes.map((b) => ({
+    startMin: timeStrToMinutes(b.start_time_str),
+    endMin: timeStrToMinutes(b.end_time_str),
+  }));
+
   const schedule: RoundSchedule[] = [];
   let cursor = new Date(bracket.start_time);
 
@@ -137,8 +204,26 @@ export function computeRoundSchedule(
     if (r > 1) {
       cursor = new Date(cursor.getTime() + bracket.rest_duration_minutes * 60_000);
     }
+
+    // Lewati break time jika cursor jatuh di dalamnya
+    cursor = skipBreakIfInside(cursor, breaks);
+
+    // Hitung jumlah pertandingan & gelombang di babak ini
+    const matchesInRound = Math.floor(bracketSize / Math.pow(2, r));
+    const courts = Math.max(1, bracket.courts_count);
+    const waves = Math.ceil(matchesInRound / courts);
+    const roundDuration = waves * bracket.match_duration_minutes + Math.max(0, waves - 1) * bracket.rest_duration_minutes;
+
+    // Pastikan seluruh durasi babak tidak tumpang-tindih dengan break time
+    // (loop untuk menangani beberapa break berturut-turut)
+    let adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
+    while (adjusted.getTime() !== cursor.getTime()) {
+      cursor = adjusted;
+      adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
+    }
+
     const start = new Date(cursor);
-    const end = new Date(start.getTime() + bracket.match_duration_minutes * 60_000);
+    const end = new Date(start.getTime() + roundDuration * 60_000);
     schedule.push({ round: r, start, end });
     cursor = end;
   }
@@ -155,12 +240,13 @@ export function computeRoundSchedule(
  */
 export function generateMatchesForBracket(
   bracket: Bracket,
-  participants: Participant[]
+  participants: Participant[],
+  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = []
 ): { matches: MatchInsert[]; totalRounds: number; bracketSize: number; remainingCollisions: number } {
   const bracketSize = nextPowerOfTwo(participants.length);
   const totalRounds = Math.log2(bracketSize);
   const { slots, remainingCollisions } = arrangeSlotsAvoidingSameClub(participants, bracketSize);
-  const schedule = computeRoundSchedule(bracket, totalRounds);
+  const schedule = computeRoundSchedule(bracket, totalRounds, bracketSize, breakTimes);
 
   const matches: MatchInsert[] = [];
 
@@ -171,6 +257,8 @@ export function generateMatchesForBracket(
   for (let r = 1; r <= totalRounds; r++) {
     const roundSchedule = schedule[r - 1];
     const matchesInRound = currentSlots.length / 2;
+    const courts = Math.max(1, bracket.courts_count);
+    const waveSlotMs = (bracket.match_duration_minutes + bracket.rest_duration_minutes) * 60_000;
     const nextSlots: Slot[] = [];
 
     for (let m = 0; m < matchesInRound; m++) {
@@ -185,6 +273,11 @@ export function generateMatchesForBracket(
         else if (isBye2 && p1) winner = p1;
       }
 
+      // Hitung waktu per-gelombang (wave)
+      const wave = Math.floor(m / courts);
+      const waveStart = new Date(roundSchedule.start.getTime() + wave * waveSlotMs);
+      const waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
+
       matches.push({
         bracket_id: bracket.id,
         round_number: r,
@@ -194,8 +287,8 @@ export function generateMatchesForBracket(
         participant1_is_bye: isBye1,
         participant2_is_bye: isBye2,
         winner_id: winner?.id ?? null,
-        start_time: roundSchedule.start.toISOString(),
-        end_time: roundSchedule.end.toISOString(),
+        start_time: waveStart.toISOString(),
+        end_time: waveEnd.toISOString(),
       });
 
       // Untuk babak selanjutnya: hanya terisi jika pemenang sudah pasti

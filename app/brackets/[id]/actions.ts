@@ -112,18 +112,29 @@ export async function generateBracketAction(bracketId: string): Promise<{ error?
 
   if (bracketError || !bracket) return { error: "Bracket tidak ditemukan." };
 
-  const { data: participants, error: participantsError } = await supabase
-    .from("participants")
-    .select("*")
-    .eq("bracket_id", bracketId)
-    .returns<Participant[]>();
+  const [{ data: participants, error: participantsError }, { data: breakTimes }] = await Promise.all([
+    supabase
+      .from("participants")
+      .select("*")
+      .eq("bracket_id", bracketId)
+      .returns<Participant[]>(),
+    supabase
+      .from("break_times")
+      .select("start_time_str, end_time_str")
+      .eq("bracket_id", bracketId)
+      .returns<{ start_time_str: string; end_time_str: string }[]>(),
+  ]);
 
   if (participantsError) return { error: participantsError.message };
   if (!participants || participants.length < 2) {
     return { error: "Minimal 2 pasangan peserta diperlukan untuk membuat bagan." };
   }
 
-  const { matches, remainingCollisions } = generateMatchesForBracket(bracket, participants);
+  const { matches, remainingCollisions } = generateMatchesForBracket(
+    bracket,
+    participants,
+    breakTimes ?? []
+  );
 
   const { error: deleteError } = await supabase.from("matches").delete().eq("bracket_id", bracketId);
   if (deleteError) return { error: deleteError.message };
@@ -311,6 +322,11 @@ export async function setWinnerAction(bracketId: string, matchId: string, partic
   revalidatePath(`/brackets/${bracketId}`);
 }
 
+/** Validasi string HH:mm */
+function isValidTimeStr(s: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+}
+
 export async function updateBracketScheduleAction(
   bracketId: string,
   _prevState: ActionState,
@@ -322,6 +338,8 @@ export async function updateBracketScheduleAction(
   const time = String(formData.get("time") ?? "");
   const matchDuration = Number(formData.get("match_duration_minutes"));
   const restDuration = Number(formData.get("rest_duration_minutes"));
+  const courtsCount = Number(formData.get("courts_count") ?? 1);
+  const breakCount = Number(formData.get("break_count") ?? 0);
 
   if (!date || !time) return { error: "Tanggal dan jam mulai wajib diisi." };
   if (!Number.isFinite(matchDuration) || matchDuration <= 0) {
@@ -329,6 +347,31 @@ export async function updateBracketScheduleAction(
   }
   if (!Number.isFinite(restDuration) || restDuration < 0) {
     return { error: "Durasi istirahat harus berupa angka 0 atau lebih." };
+  }
+  if (!Number.isFinite(courtsCount) || courtsCount < 1) {
+    return { error: "Jumlah lapangan minimal 1." };
+  }
+
+  // Parse break times
+  const breakTimes: { label: string; start_time_str: string; end_time_str: string }[] = [];
+  if (Number.isFinite(breakCount) && breakCount > 0) {
+    for (let i = 0; i < breakCount; i++) {
+      const label = String(formData.get(`break_label_${i}`) ?? "").trim();
+      const startStr = String(formData.get(`break_start_${i}`) ?? "").trim();
+      const endStr = String(formData.get(`break_end_${i}`) ?? "").trim();
+
+      if (!startStr || !endStr) {
+        return { error: `Waktu istirahat khusus ke-${i + 1}: jam mulai dan selesai wajib diisi.` };
+      }
+      if (!isValidTimeStr(startStr) || !isValidTimeStr(endStr)) {
+        return { error: `Waktu istirahat khusus ke-${i + 1}: format jam tidak valid (HH:mm).` };
+      }
+      if (startStr >= endStr) {
+        return { error: `Waktu istirahat khusus ke-${i + 1}: jam mulai harus sebelum jam selesai.` };
+      }
+
+      breakTimes.push({ label, start_time_str: startStr, end_time_str: endStr });
+    }
   }
 
   const startTime = new Date(`${date}T${time}:00`);
@@ -341,13 +384,32 @@ export async function updateBracketScheduleAction(
       start_time: startTime.toISOString(),
       match_duration_minutes: matchDuration,
       rest_duration_minutes: restDuration,
+      courts_count: courtsCount,
     })
     .eq("id", bracketId);
 
   if (error) return { error: error.message };
 
-  // Bagan yang sudah ada butuh diacak ulang supaya jadwal jam ikut ter-update
-  // (jadwal dihitung ulang penuh saat "Acak / Buat Bagan" ditekan).
+  // Replace break times: hapus semua yang lama, insert yang baru
+  const { error: deleteBreakError } = await supabase
+    .from("break_times")
+    .delete()
+    .eq("bracket_id", bracketId);
+
+  if (deleteBreakError) return { error: deleteBreakError.message };
+
+  if (breakTimes.length > 0) {
+    const { error: insertBreakError } = await supabase.from("break_times").insert(
+      breakTimes.map((b) => ({
+        bracket_id: bracketId,
+        label: b.label,
+        start_time_str: b.start_time_str,
+        end_time_str: b.end_time_str,
+      }))
+    );
+    if (insertBreakError) return { error: insertBreakError.message };
+  }
+
   revalidatePath(`/brackets/${bracketId}`);
   return { success: "Jadwal diperbarui. Tekan tombol acak ulang di bawah agar jam pertandingan ikut diperbarui." };
 }

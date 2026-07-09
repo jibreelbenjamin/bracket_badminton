@@ -11,6 +11,7 @@ export type Bracket = {
   start_time: string; // ISO timestamp
   match_duration_minutes: number;
   rest_duration_minutes: number;
+  courts_count: number;
   status: "draft" | "generated";
   created_at: string;
 };
@@ -39,5 +40,20 @@ export type MatchRow = {
 };
 
 export type MatchInsert = Omit<MatchRow, "id" | "created_at">;
+
+export type BreakTime = {
+  id: string;
+  bracket_id: string;
+  label: string;
+  start_time_str: string; // HH:mm
+  end_time_str: string;   // HH:mm
+  created_at: string;
+};
+
+export type BreakTimeInsert = {
+  label: string;
+  start_time_str: string;
+  end_time_str: string;
+};
 
 export type ActionState = { error?: string; success?: string } | undefined;

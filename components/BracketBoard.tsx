@@ -148,6 +148,7 @@ export default function BracketBoard({
             const spacing = MATCH_HEIGHT * Math.pow(2, roundNum - 1);
             const isLastRound = roundNum === totalRounds;
             const first = roundMatches[0];
+            const last = roundMatches[roundMatches.length - 1];
 
             return (
               <div
@@ -157,9 +158,9 @@ export default function BracketBoard({
               >
                 <div className="round-header">
                   <div className="round-title">{roundLabel(roundNum, totalRounds)}</div>
-                  {first?.start_time && first.end_time && (
+                  {first?.start_time && last?.end_time && (
                     <div className="round-time">
-                      {formatTime(first.start_time)} - {formatTime(first.end_time)}
+                      {formatTime(first.start_time)} - {formatTime(last.end_time)}
                     </div>
                   )}
                 </div>

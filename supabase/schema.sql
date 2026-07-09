@@ -30,6 +30,7 @@ create table if not exists brackets (
   start_time timestamptz not null,
   match_duration_minutes int not null default 20,
   rest_duration_minutes int not null default 15,
+  courts_count int not null default 1,
   status text not null default 'draft', -- draft | generated
   created_at timestamptz not null default now()
 );
@@ -69,6 +70,23 @@ create table if not exists matches (
 create index if not exists matches_bracket_id_idx on matches(bracket_id);
 
 -- ---------------------------------------------------------
+-- break_times: rentang waktu istirahat khusus per bracket
+-- (misal: waktu sholat). Disimpan dalam format HH:mm (waktu
+-- dalam sehari) dan berlaku berulang setiap hari selama
+-- turnamen berlangsung.
+-- ---------------------------------------------------------
+create table if not exists break_times (
+  id uuid primary key default gen_random_uuid(),
+  bracket_id uuid not null references brackets(id) on delete cascade,
+  label text not null default '',
+  start_time_str text not null, -- format HH:mm
+  end_time_str text not null,   -- format HH:mm
+  created_at timestamptz not null default now()
+);
+
+create index if not exists break_times_bracket_id_idx on break_times(bracket_id);
+
+-- ---------------------------------------------------------
 -- Row Level Security
 -- Aplikasi ini TIDAK memakai Supabase Auth / anon key di browser.
 -- Semua akses dilakukan lewat server (Next.js Server Actions) memakai
@@ -80,3 +98,4 @@ alter table app_settings enable row level security;
 alter table brackets enable row level security;
 alter table participants enable row level security;
 alter table matches enable row level security;
+alter table break_times enable row level security;
