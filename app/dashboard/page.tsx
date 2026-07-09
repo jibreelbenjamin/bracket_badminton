@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { Bracket } from "@/lib/types";
 import LogoutButton from "@/components/LogoutButton";
-import DeleteBracketButton from "@/components/DeleteBracketButton";
+import BracketList from "@/components/BracketList";
 
 export const dynamic = "force-dynamic";
 
@@ -38,53 +38,7 @@ export default async function DashboardPage() {
         <span className="text-lg leading-none">+</span> Buat Bracket Baru
       </Link>
 
-      <div className="grid gap-4">
-        {(brackets ?? []).map((b) => (
-          <div
-            key={b.id}
-            className="bg-white shadow-sm hover:shadow-md transition-shadow rounded-2xl border border-court-100 relative"
-          >
-            <Link href={`/brackets/${b.id}`} className="block p-5">
-              <div className="flex justify-between items-start gap-4">
-                <div>
-                  <h2 className="font-semibold text-ink-900">{b.name}</h2>
-                  <p className="text-sm text-ink-500 mt-0.5">
-                    Mulai{" "}
-                    {new Date(b.start_time).toLocaleString("id-ID", {
-                      dateStyle: "full",
-                      timeStyle: "short",
-                    })}
-                  </p>
-                  <p className="text-xs text-ink-300 mt-1">
-                    Durasi tiap babak {b.match_duration_minutes} menit &middot; Istirahat antar babak{" "}
-                    {b.rest_duration_minutes} menit
-                  </p>
-                </div>
-                <span
-                  className={`text-xs uppercase font-semibold px-3 py-1 rounded-full whitespace-nowrap ${
-                    b.status === "generated"
-                      ? "bg-court-100 text-court-700"
-                      : "bg-cork-100 text-cork-600"
-                  }`}
-                >
-                  {b.status === "generated" ? "Sudah Diacak" : "Draft"}
-                </span>
-              </div>
-            </Link>
-            <div className="absolute bottom-3 right-4">
-              <DeleteBracketButton bracketId={b.id} bracketName={b.name} />
-            </div>
-          </div>
-        ))}
-
-        {(!brackets || brackets.length === 0) && (
-          <div className="text-center py-16 border-2 border-dashed border-court-200 rounded-2xl">
-            <p className="text-ink-500 text-sm">
-              Belum ada bracket. Klik &ldquo;Buat Bracket Baru&rdquo; untuk memulai turnamen pertama Anda.
-            </p>
-          </div>
-        )}
-      </div>
+      <BracketList brackets={brackets ?? []} />
     </main>
   );
 }

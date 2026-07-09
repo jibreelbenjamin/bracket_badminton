@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { setWinnerAction } from "@/app/brackets/[id]/actions";
@@ -24,6 +24,7 @@ export default function MatchBox({
   style: React.CSSProperties;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const router = useRouter();
 
   const canPick =
@@ -35,28 +36,42 @@ export default function MatchBox({
 
   function pick(winnerId: string) {
     if (!canPick) return;
+    setProcessingId(winnerId);
     startTransition(async () => {
       try {
         await setWinnerAction(bracketId, match.id, winnerId);
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Gagal menetapkan pemenang.");
+      } finally {
+        setProcessingId(null);
       }
     });
   }
 
   return (
-    <div className="match-box" style={style} data-testid="match-box">
+    <div
+      className={`match-box${isPending ? " match-box--loading" : ""}`}
+      style={style}
+      data-testid="match-box"
+    >
       <div className="match-time">
         {match.start_time && match.end_time
           ? `${formatTime(match.start_time)} - ${formatTime(match.end_time)}`
           : ""}
       </div>
+      {isPending && (
+        <div className="match-box__loading-overlay">
+          <span className="match-box__spinner" />
+          <span className="match-box__loading-text">Memproses...</span>
+        </div>
+      )}
       <PlayerRow
         participant={p1}
         isBye={match.participant1_is_bye}
         isWinner={!!match.winner_id && match.winner_id === p1?.id}
         clickable={canPick}
+        isLoading={processingId === p1?.id}
         onClick={() => p1 && pick(p1.id)}
       />
       <PlayerRow
@@ -64,6 +79,7 @@ export default function MatchBox({
         isBye={match.participant2_is_bye}
         isWinner={!!match.winner_id && match.winner_id === p2?.id}
         clickable={canPick}
+        isLoading={processingId === p2?.id}
         onClick={() => p2 && pick(p2.id)}
       />
     </div>
@@ -75,12 +91,14 @@ function PlayerRow({
   isBye,
   isWinner,
   clickable,
+  isLoading,
   onClick,
 }: {
   participant: Participant | null;
   isBye: boolean;
   isWinner: boolean;
   clickable: boolean;
+  isLoading: boolean;
   onClick: () => void;
 }) {
   if (isBye) {
@@ -100,13 +118,15 @@ function PlayerRow({
       type="button"
       onClick={clickable ? onClick : undefined}
       disabled={!clickable}
-      className={`player-row${isWinner ? " winner" : ""}`}
+      className={`player-row${isWinner ? " winner" : ""}${isLoading ? " player-row--loading" : ""}`}
       title={
-        clickable
-          ? isWinner
-            ? "Klik untuk membatalkan kemenangan"
-            : "Klik untuk menetapkan sebagai pemenang"
-          : undefined
+        isLoading
+          ? "Memproses..."
+          : clickable
+            ? isWinner
+              ? "Klik untuk membatalkan kemenangan"
+              : "Klik untuk menetapkan sebagai pemenang"
+            : undefined
       }
     >
       <span className="player-name">{participant.name}</span>
