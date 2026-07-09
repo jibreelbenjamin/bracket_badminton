@@ -131,6 +131,9 @@ export async function generateBracketAction(bracketId: string): Promise<{ error?
   const { error: insertError } = await supabase.from("matches").insert(matches);
   if (insertError) return { error: insertError.message };
 
+  // Auto-resolve match yang hanya punya 1 peserta real (dari BYE vs BYE dsb)
+  await autoResolveAllMatches(supabase, bracketId);
+
   await supabase.from("brackets").update({ status: "generated" }).eq("id", bracketId);
 
   revalidatePath(`/brackets/${bracketId}`);
@@ -170,6 +173,84 @@ async function clearDownstream(
 
   if (hadWinner) {
     await clearDownstream(supabase, bracketId, nextRound, nextMatchIndex);
+  }
+}
+
+/**
+ * Auto-resolve: jika sebuah match hanya memiliki tepat 1 peserta real
+ * (lawan null/BYE), otomatis tetapkan peserta itu sebagai pemenang
+ * dan teruskan ke babak berikutnya secara rekursif.
+ */
+async function autoResolveMatch(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  bracketId: string,
+  roundNumber: number,
+  matchIndex: number
+): Promise<void> {
+  const { data: match } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("bracket_id", bracketId)
+    .eq("round_number", roundNumber)
+    .eq("match_index", matchIndex)
+    .maybeSingle<MatchRow>();
+
+  if (!match) return;
+  if (match.winner_id) return; // sudah ada pemenang
+
+  const p1 = match.participant1_id;
+  const p2 = match.participant2_id;
+
+  // Hanya auto-resolve jika tepat 1 peserta real
+  if (!((p1 && !p2) || (!p1 && p2))) return;
+
+  const winnerId = (p1 ?? p2)!;
+
+  await supabase.from("matches").update({ winner_id: winnerId }).eq("id", match.id);
+
+  // Propagasi ke babak berikutnya
+  const { nextMatchIndex, slot } = nextRoundTarget(matchIndex);
+  const nextRound = roundNumber + 1;
+
+  const { data: nextMatch } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("bracket_id", bracketId)
+    .eq("round_number", nextRound)
+    .eq("match_index", nextMatchIndex)
+    .maybeSingle<{ id: string }>();
+
+  if (nextMatch) {
+    await supabase.from("matches").update({ [slot]: winnerId }).eq("id", nextMatch.id);
+    // Rekursif: periksa apakah nextMatch sekarang juga bisa di-auto-resolve
+    await autoResolveMatch(supabase, bracketId, nextRound, nextMatchIndex);
+  }
+}
+
+/**
+ * Scan semua match di bracket (urut per babak & indeks) dan auto-resolve
+ * match yang hanya punya 1 peserta real. Dipanggil setelah generate bagan.
+ */
+async function autoResolveAllMatches(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  bracketId: string
+): Promise<void> {
+  const { data: matches } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("bracket_id", bracketId)
+    .order("round_number", { ascending: true })
+    .order("match_index", { ascending: true })
+    .returns<MatchRow[]>();
+
+  if (!matches) return;
+
+  for (const m of matches) {
+    const p1 = m.participant1_id;
+    const p2 = m.participant2_id;
+    if (!m.winner_id && ((p1 && !p2) || (!p1 && p2))) {
+      await autoResolveMatch(supabase, bracketId, m.round_number, m.match_index);
+    }
   }
 }
 
@@ -216,6 +297,8 @@ export async function setWinnerAction(bracketId: string, matchId: string, partic
 
     if (nextMatch) {
       await supabase.from("matches").update({ [slot]: newWinnerId }).eq("id", nextMatch.id);
+      // Auto-resolve jika nextMatch sekarang hanya punya 1 peserta real
+      await autoResolveMatch(supabase, bracketId, nextRound, nextMatchIndex);
     }
   }
 

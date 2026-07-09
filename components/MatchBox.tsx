@@ -29,8 +29,7 @@ export default function MatchBox({
 
   const canPick =
     !isPending &&
-    !!p1 &&
-    !!p2 &&
+    (!!p1 || !!p2) &&
     !match.participant1_is_bye &&
     !match.participant2_is_bye;
 
