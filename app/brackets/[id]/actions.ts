@@ -177,9 +177,10 @@ async function clearDownstream(
 }
 
 /**
- * Auto-resolve: jika sebuah match hanya memiliki tepat 1 peserta real
- * (lawan null/BYE), otomatis tetapkan peserta itu sebagai pemenang
- * dan teruskan ke babak berikutnya secara rekursif.
+ * Auto-resolve: jika sebuah match di babak 1 memiliki tepat 1 peserta real
+ * (lawan BYE struktural), otomatis tetapkan peserta itu sebagai pemenang
+ * dan teruskan ke babak berikutnya. Hanya berlaku untuk babak 1 —
+ * babak selanjutnya harus di-toggle manual oleh user.
  */
 async function autoResolveMatch(
   supabase: ReturnType<typeof getSupabaseServer>,
@@ -187,6 +188,9 @@ async function autoResolveMatch(
   roundNumber: number,
   matchIndex: number
 ): Promise<void> {
+  // Hanya auto-resolve untuk babak 1 (BYE struktural)
+  if (roundNumber > 1) return;
+
   const { data: match } = await supabase
     .from("matches")
     .select("*")
@@ -208,7 +212,7 @@ async function autoResolveMatch(
 
   await supabase.from("matches").update({ winner_id: winnerId }).eq("id", match.id);
 
-  // Propagasi ke babak berikutnya
+  // Propagasi ke babak berikutnya (hanya isi slot, jangan auto-resolve lagi)
   const { nextMatchIndex, slot } = nextRoundTarget(matchIndex);
   const nextRound = roundNumber + 1;
 
@@ -222,14 +226,16 @@ async function autoResolveMatch(
 
   if (nextMatch) {
     await supabase.from("matches").update({ [slot]: winnerId }).eq("id", nextMatch.id);
-    // Rekursif: periksa apakah nextMatch sekarang juga bisa di-auto-resolve
+    // Propagasi peserta ke babak berikutnya tanpa auto-resolve
     await autoResolveMatch(supabase, bracketId, nextRound, nextMatchIndex);
   }
 }
 
 /**
- * Scan semua match di bracket (urut per babak & indeks) dan auto-resolve
- * match yang hanya punya 1 peserta real. Dipanggil setelah generate bagan.
+ * Scan match di babak 1 dan auto-resolve match yang hanya punya 1 peserta
+ * real (BYE struktural). Hanya berlaku untuk babak 1 — babak selanjutnya
+ * harus di-toggle manual oleh user agar tidak auto-juara sebelum lawan
+ * dari sisi bracket lain terisi.
  */
 async function autoResolveAllMatches(
   supabase: ReturnType<typeof getSupabaseServer>,
@@ -239,7 +245,7 @@ async function autoResolveAllMatches(
     .from("matches")
     .select("*")
     .eq("bracket_id", bracketId)
-    .order("round_number", { ascending: true })
+    .eq("round_number", 1)
     .order("match_index", { ascending: true })
     .returns<MatchRow[]>();
 
@@ -297,8 +303,8 @@ export async function setWinnerAction(bracketId: string, matchId: string, partic
 
     if (nextMatch) {
       await supabase.from("matches").update({ [slot]: newWinnerId }).eq("id", nextMatch.id);
-      // Auto-resolve jika nextMatch sekarang hanya punya 1 peserta real
-      await autoResolveMatch(supabase, bracketId, nextRound, nextMatchIndex);
+      // Jangan auto-resolve di babak > 1 — biarkan user toggle manual
+      // agar tidak auto-juara sebelum lawan dari sisi bracket lain terisi.
     }
   }
 

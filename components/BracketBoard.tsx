@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Trophy } from "lucide-react";
 import { roundLabel } from "@/lib/bracket-logic";
 import type { Bracket, MatchRow, Participant } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import MatchBox from "./MatchBox";
+import WinnerDialog, { type WinnerDialogHandle } from "./WinnerDialog";
 
 const MATCH_HEIGHT = 96; // jarak vertikal antar pertandingan di babak 1 (px)
 const BOX_HEIGHT = 84; // tinggi kotak pertandingan (px)
@@ -25,6 +26,7 @@ export default function BracketBoard({
 }) {
   const exportRef = useRef<HTMLDivElement>(null);
   const fullscreenRef = useRef<HTMLDivElement>(null);
+  const winnerDialogRef = useRef<WinnerDialogHandle>(null);
   const [exporting, setExporting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -118,10 +120,26 @@ export default function BracketBoard({
       </div>
 
       {champion && (
-        <div className="champion-banner mb-4 bg-cork-100 text-cork-600 px-4 py-3 rounded-xl">
-          🏆 Juara: {champion.name} {champion.club_name && `(${champion.club_name})`}
+        <div className="mb-4 flex items-center gap-3 p-3 bg-court-50 rounded-2xl border border-court-200">
+          <div className="flex-1">
+            <p className="text-sm font-display font-bold text-court-900">
+              Turnamen selesai!
+            </p>
+            <p className="text-xs text-ink-500">
+              Lihat siapa saja pemenangnya.
+            </p>
+          </div>
+          <Button
+            onClick={() => winnerDialogRef.current?.show()}
+            size="sm"
+            className="shrink-0 bg-court-700 hover:bg-court-800 text-white"
+          >
+            Lihat Pemenang
+          </Button>
         </div>
       )}
+
+      <WinnerDialog ref={winnerDialogRef} matches={matches} participants={participants} />
 
       <div className="overflow-x-auto pb-6 -mx-6 px-6">
         <div ref={exportRef} className="bracket-export">
