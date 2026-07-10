@@ -7,6 +7,7 @@ import { updateBracketNameAction } from "@/app/brackets/[id]/actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useBracketLoading } from "@/components/BracketLoadingProvider";
 import {
   Dialog,
   DialogContent,
@@ -27,15 +28,23 @@ export default function BracketNameEditor({
   const [open, setOpen] = useState(false);
   const boundAction = updateBracketNameAction.bind(null, bracketId);
   const [state, formAction, pending] = useActionState(boundAction, undefined);
+  const { setBracketLoading } = useBracketLoading();
 
   useEffect(() => {
     if (state?.success) {
       toast.success(state.success);
       setOpen(false);
+      setBracketLoading(false);
     } else if (state?.error) {
       toast.error(state.error);
+      setBracketLoading(false);
     }
-  }, [state]);
+  }, [state, setBracketLoading]);
+
+  // Sync pending state to bracket loading
+  useEffect(() => {
+    setBracketLoading(pending);
+  }, [pending, setBracketLoading]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

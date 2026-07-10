@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { parseParticipantsExcel } from "@/lib/excel";
-import { generateMatchesForBracket, nextRoundTarget } from "@/lib/bracket-logic";
+import { generateMatchesForBracket, nextRoundTarget, recomputeMatchTimes } from "@/lib/bracket-logic";
 import { logActivity } from "@/lib/activity-log";
 import type { ActionState, Bracket, MatchRow, Participant } from "@/lib/types";
 
@@ -75,6 +75,43 @@ export async function addParticipantAction(
 export async function deleteParticipantAction(bracketId: string, participantId: string) {
   await requireAuth();
   const supabase = getSupabaseServer();
+
+  // Cari semua pertandingan yang mereferensikan peserta ini
+  const { data: affectedMatches } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("bracket_id", bracketId)
+    .or(`participant1_id.eq.${participantId},participant2_id.eq.${participantId}`)
+    .returns<MatchRow[]>();
+
+  if (affectedMatches && affectedMatches.length > 0) {
+    for (const match of affectedMatches) {
+      const updates: Record<string, unknown> = {};
+
+      if (match.participant1_id === participantId) {
+        updates.participant1_id = null;
+        updates.participant1_is_bye = true;
+      }
+      if (match.participant2_id === participantId) {
+        updates.participant2_id = null;
+        updates.participant2_is_bye = true;
+      }
+
+      // Jika peserta yang dihapus adalah pemenang, hapus pemenang & bersihkan downstream
+      if (match.winner_id === participantId) {
+        updates.winner_id = null;
+        await clearDownstream(supabase, bracketId, match.round_number, match.match_index);
+      }
+
+      await supabase.from("matches").update(updates).eq("id", match.id);
+    }
+
+    // Auto-resolve ulang: jika setelah dihapus, match jadi BYE vs kosong → otomatis menang
+    for (const match of affectedMatches) {
+      await autoResolveMatch(supabase, bracketId, match.round_number, match.match_index);
+    }
+  }
+
   const { error } = await supabase.from("participants").delete().eq("id", participantId);
   if (error) throw new Error(error.message);
   await logActivity("delete_participant", `Menghapus peserta ${participantId} dari bracket ${bracketId}`);
@@ -418,8 +455,36 @@ export async function updateBracketScheduleAction(
   }
 
   await logActivity("update_schedule", `Update jadwal bracket ${bracketId}`);
+
+  // === Auto-update match times if bracket already has matches ===
+  const { data: existingMatches } = await supabase
+    .from("matches")
+    .select("id, round_number, match_index")
+    .eq("bracket_id", bracketId)
+    .order("round_number")
+    .order("match_index");
+
+  if (existingMatches && existingMatches.length > 0) {
+    const updatedTimes = recomputeMatchTimes(
+      {
+        start_time: startTime.toISOString(),
+        match_duration_minutes: matchDuration,
+        rest_duration_minutes: restDuration,
+        courts_count: courtsCount,
+      },
+      existingMatches,
+      breakTimes
+    );
+
+    // Batch update all match times
+    const updatePromises = Array.from(updatedTimes.entries()).map(([matchId, times]) =>
+      supabase.from("matches").update({ start_time: times.start_time, end_time: times.end_time }).eq("id", matchId)
+    );
+    await Promise.all(updatePromises);
+  }
+
   revalidatePath(`/brackets/${bracketId}`);
-  return { success: "Jadwal diperbarui. Tekan tombol acak ulang di bawah agar jam pertandingan ikut diperbarui." };
+  return { success: "Jadwal dan waktu pertandingan berhasil diperbarui." };
 }
 
 export async function updateBracketNameAction(

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/DatePicker";
 import { TimePicker } from "@/components/TimePicker";
+import { useBracketLoading } from "@/components/BracketLoadingProvider";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ export default function ScheduleEditor({
   const [open, setOpen] = useState(false);
   const boundAction = updateBracketScheduleAction.bind(null, bracket.id);
   const [state, formAction, pending] = useActionState(boundAction, undefined);
+  const { setBracketLoading } = useBracketLoading();
 
   const [breaks, setBreaks] = useState<BreakEntry[]>(() =>
     breakTimes.map((_, i) => ({ id: nextBreakId() }))
@@ -46,10 +48,17 @@ export default function ScheduleEditor({
     if (state?.success) {
       toast.success(state.success);
       setOpen(false);
+      setBracketLoading(false);
     } else if (state?.error) {
       toast.error(state.error);
+      setBracketLoading(false);
     }
-  }, [state]);
+  }, [state, setBracketLoading]);
+
+  // Sync pending state to bracket loading
+  useEffect(() => {
+    setBracketLoading(pending);
+  }, [pending, setBracketLoading]);
 
   const start = new Date(bracket.start_time);
   const defaultDate = start.toISOString().slice(0, 10);
@@ -74,7 +83,7 @@ export default function ScheduleEditor({
         <DialogHeader>
           <DialogTitle>Ubah Jadwal Turnamen</DialogTitle>
           <DialogDescription>
-            Perubahan jadwal baru akan terlihat di bagan setelah Anda menekan tombol acak ulang.
+            Perubahan jadwal akan otomatis memperbarui waktu semua pertandingan di bagan.
           </DialogDescription>
         </DialogHeader>
 

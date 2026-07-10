@@ -313,3 +313,49 @@ export function nextRoundTarget(matchIndex: number): {
     slot: matchIndex % 2 === 0 ? "participant1_id" : "participant2_id",
   };
 }
+
+/**
+ * Menghitung ulang jadwal (start_time, end_time) untuk semua pertandingan
+ * berdasarkan konfigurasi bracket terbaru, TANPA mengubah peserta/posisi.
+ * Mengembalikan map match_id → { start_time, end_time } yang baru.
+ */
+export function recomputeMatchTimes(
+  bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes" | "courts_count">,
+  matches: { id: string; round_number: number; match_index: number }[],
+  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = []
+): Map<string, { start_time: string; end_time: string }> {
+  const totalRounds = Math.max(...matches.map((m) => m.round_number), 1);
+  // BracketSize = 2^totalRounds, tapi untuk perhitungan jadwal kita hanya perlu totalRounds
+  const bracketSize = Math.pow(2, totalRounds);
+  const schedule = computeRoundSchedule(bracket, totalRounds, bracketSize, breakTimes);
+
+  const courts = Math.max(1, bracket.courts_count);
+  const waveSlotMs = (bracket.match_duration_minutes + bracket.rest_duration_minutes) * 60_000;
+
+  const result = new Map<string, { start_time: string; end_time: string }>();
+
+  // Group matches by round
+  const byRound = new Map<number, typeof matches>();
+  for (const m of matches) {
+    if (!byRound.has(m.round_number)) byRound.set(m.round_number, []);
+    byRound.get(m.round_number)!.push(m);
+  }
+
+  for (const [roundNum, roundMatches] of byRound) {
+    const roundSchedule = schedule[roundNum - 1];
+    if (!roundSchedule) continue;
+
+    for (const match of roundMatches) {
+      const wave = Math.floor(match.match_index / courts);
+      const waveStart = new Date(roundSchedule.start.getTime() + wave * waveSlotMs);
+      const waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
+
+      result.set(match.id, {
+        start_time: waveStart.toISOString(),
+        end_time: waveEnd.toISOString(),
+      });
+    }
+  }
+
+  return result;
+}

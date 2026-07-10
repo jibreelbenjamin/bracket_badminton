@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
-import { Maximize2, Minimize2, Trophy } from "lucide-react";
+import { Loader2, Maximize2, Minimize2, Trophy } from "lucide-react";
 import { roundLabel } from "@/lib/bracket-logic";
 import type { Bracket, MatchRow, Participant } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import MatchBox from "./MatchBox";
 import WinnerDialog, { type WinnerDialogHandle } from "./WinnerDialog";
+import { useBracketLoading } from "./BracketLoadingProvider";
 
 const MATCH_HEIGHT = 96; // jarak vertikal antar pertandingan di babak 1 (px)
 const BOX_HEIGHT = 84; // tinggi kotak pertandingan (px)
@@ -29,6 +30,7 @@ export default function BracketBoard({
   const winnerDialogRef = useRef<WinnerDialogHandle>(null);
   const [exporting, setExporting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { isBracketLoading } = useBracketLoading();
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -141,7 +143,17 @@ export default function BracketBoard({
 
       <WinnerDialog ref={winnerDialogRef} matches={matches} participants={participants} />
 
-      <div className="overflow-x-auto pb-6 -mx-6 px-6">
+      <div className="relative overflow-x-auto pb-6 -mx-6 px-6">
+        {/* Loading overlay */}
+        {isBracketLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-6 py-4 shadow-lg border border-court-100">
+              <Loader2 className="h-8 w-8 animate-spin text-court-700" />
+              <p className="text-sm font-medium text-ink-700">Memperbarui bagan...</p>
+            </div>
+          </div>
+        )}
+
         <div ref={exportRef} className="bracket-export">
           {Array.from({ length: totalRounds }, (_, i) => i + 1).map((roundNum) => {
             const roundMatches = roundsMap.get(roundNum) ?? [];
