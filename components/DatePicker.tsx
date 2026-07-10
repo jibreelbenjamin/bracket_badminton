@@ -18,10 +18,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 export function DatePicker({
   name,
   defaultValue,
+  disabled,
   className,
 }: {
   name: string;
   defaultValue?: string;
+  disabled?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -32,12 +34,13 @@ export function DatePicker({
   const isoValue = date ? formatIsoDate(date) : "";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <input type="hidden" name={name} value={isoValue} />
+    <Popover open={disabled ? false : open} onOpenChange={setOpen}>
+      <input type="hidden" name={name} value={isoValue} autoComplete="off" />
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
+          disabled={disabled}
           className={cn(
             "w-full justify-start bg-court-50 text-left font-normal",
             !date && "text-muted-foreground",

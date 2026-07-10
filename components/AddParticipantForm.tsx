@@ -27,12 +27,14 @@ export default function AddParticipantForm({ bracketId }: { bracketId: string })
         type="text"
         placeholder="Nama pasangan peserta"
         required
+        disabled={pending}
         className="flex-1 min-w-[140px] bg-court-50"
       />
       <Input
         name="club_name"
         type="text"
         placeholder="Nama PB"
+        disabled={pending}
         className="flex-1 min-w-[120px] bg-court-50"
       />
       <Button type="submit" disabled={pending} variant="secondary">

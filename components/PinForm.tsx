@@ -74,7 +74,7 @@ export default function PinForm() {
 
   return (
     <form ref={formRef} action={formAction} className="space-y-5">
-      <input type="hidden" name="pin" value={pin} />
+      <input type="hidden" name="pin" value={pin} autoComplete="off" />
 
       <div className="flex justify-center gap-3">
         {digits.map((digit, i) => (
@@ -90,12 +90,14 @@ export default function PinForm() {
             maxLength={1}
             value={digit}
             autoFocus={i === 0}
+            disabled={pending}
             onChange={(e) => handleChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={handlePaste}
             className={cn(
               "h-14 w-14 rounded-xl border border-input bg-court-50 text-center text-2xl font-display font-bold text-court-900 shadow-sm transition-colors",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+              pending && "opacity-50 cursor-not-allowed"
             )}
           />
         ))}

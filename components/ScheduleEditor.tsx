@@ -82,11 +82,11 @@ export default function ScheduleEditor({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className="mb-1 block text-xs text-ink-700">Tanggal Mulai</Label>
-              <DatePicker name="date" defaultValue={defaultDate} />
+              <DatePicker name="date" defaultValue={defaultDate} disabled={pending} />
             </div>
             <div>
               <Label className="mb-1 block text-xs text-ink-700">Jam Mulai</Label>
-              <TimePicker name="time" defaultValue={defaultTime} />
+              <TimePicker name="time" defaultValue={defaultTime} disabled={pending} />
             </div>
             <div>
               <Label htmlFor="courts_count" className="mb-1 block text-xs text-ink-700">
@@ -99,6 +99,7 @@ export default function ScheduleEditor({
                 min={1}
                 defaultValue={bracket.courts_count ?? 1}
                 required
+                disabled={pending}
                 className="bg-court-50"
               />
             </div>
@@ -116,6 +117,7 @@ export default function ScheduleEditor({
                 min={1}
                 defaultValue={bracket.match_duration_minutes}
                 required
+                disabled={pending}
                 className="bg-court-50"
               />
             </div>
@@ -130,6 +132,7 @@ export default function ScheduleEditor({
                 min={0}
                 defaultValue={bracket.rest_duration_minutes}
                 required
+                disabled={pending}
                 className="bg-court-50"
               />
             </div>
@@ -161,6 +164,7 @@ export default function ScheduleEditor({
                           name={`break_label_${i}`}
                           placeholder="cth: Dzuhur"
                           defaultValue={existing?.label ?? ""}
+                          disabled={pending}
                           className="bg-white text-xs h-8"
                         />
                       </div>
@@ -170,7 +174,9 @@ export default function ScheduleEditor({
                           type="time"
                           name={`break_start_${i}`}
                           defaultValue={existing?.start_time_str ?? "12:00"}
-                          className="flex h-8 w-full rounded-md border border-court-200 bg-white px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400"
+                          autoComplete="off"
+                          disabled={pending}
+                          className="flex h-8 w-full rounded-md border border-court-200 bg-white px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                       </div>
                       <div className="col-span-3">
@@ -179,7 +185,9 @@ export default function ScheduleEditor({
                           type="time"
                           name={`break_end_${i}`}
                           defaultValue={existing?.end_time_str ?? "13:00"}
-                          className="flex h-8 w-full rounded-md border border-court-200 bg-white px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400"
+                          autoComplete="off"
+                          disabled={pending}
+                          className="flex h-8 w-full rounded-md border border-court-200 bg-white px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                       </div>
                     </div>
@@ -198,7 +206,7 @@ export default function ScheduleEditor({
             </div>
           </div>
 
-          <input type="hidden" name="break_count" value={breaks.length} />
+          <input type="hidden" name="break_count" value={breaks.length} autoComplete="off" />
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>

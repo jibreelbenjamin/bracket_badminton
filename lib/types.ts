@@ -3,6 +3,7 @@ export type AppSettings = {
   pin: string;
   default_match_duration_minutes: number;
   default_rest_duration_minutes: number;
+  default_courts_count: number;
 };
 
 export type Bracket = {

@@ -26,6 +26,7 @@ export default async function NewBracketPage() {
         <CreateBracketForm
           defaultMatchDuration={settings?.default_match_duration_minutes ?? 20}
           defaultRestDuration={settings?.default_rest_duration_minutes ?? 15}
+          defaultCourtsCount={settings?.default_courts_count ?? 1}
         />
       </div>
     </main>

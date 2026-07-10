@@ -77,7 +77,7 @@ export default function ImportParticipantsForm({ bracketId }: { bracketId: strin
           </DialogHeader>
 
           <form ref={formRef} action={formAction} className="space-y-4">
-            <Input type="file" name="file" accept=".xlsx,.xls" required className="bg-court-50" />
+            <Input type="file" name="file" accept=".xlsx,.xls" required disabled={pending} className="bg-court-50" />
 
             <DialogFooter>
               <Button type="submit" disabled={pending} className="w-full sm:w-auto">

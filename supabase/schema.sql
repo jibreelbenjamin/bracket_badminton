@@ -13,6 +13,7 @@ create table if not exists app_settings (
   pin text not null default '8888',
   default_match_duration_minutes int not null default 20,
   default_rest_duration_minutes int not null default 15,
+  default_courts_count int not null default 1,
   updated_at timestamptz not null default now(),
   constraint app_settings_single_row check (id = 1)
 );

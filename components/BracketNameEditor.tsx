@@ -63,6 +63,7 @@ export default function BracketNameEditor({
               name="name"
               type="text"
               required
+              disabled={pending}
               defaultValue={currentName}
               className="bg-court-50"
             />

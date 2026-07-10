@@ -20,9 +20,11 @@ function nextBreakId() {
 export default function CreateBracketForm({
   defaultMatchDuration,
   defaultRestDuration,
+  defaultCourtsCount,
 }: {
   defaultMatchDuration: number;
   defaultRestDuration: number;
+  defaultCourtsCount: number;
 }) {
   const [state, formAction, pending] = useActionState(createBracketAction, undefined);
   const [breaks, setBreaks] = useState<BreakEntry[]>([]);
@@ -53,6 +55,7 @@ export default function CreateBracketForm({
           name="name"
           type="text"
           required
+          disabled={pending}
           placeholder="Contoh: Turnamen Kemerdekaan"
           className="bg-court-50"
         />
@@ -61,11 +64,11 @@ export default function CreateBracketForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label className="mb-1.5 block text-ink-700">Tanggal Mulai</Label>
-          <DatePicker name="date" defaultValue={defaultDate} />
+          <DatePicker name="date" defaultValue={defaultDate} disabled={pending} />
         </div>
         <div>
           <Label className="mb-1.5 block text-ink-700">Jam Mulai (Babak 1)</Label>
-          <TimePicker name="time" defaultValue="08:00" />
+          <TimePicker name="time" defaultValue="08:00" disabled={pending} />
         </div>
       </div>
 
@@ -80,6 +83,7 @@ export default function CreateBracketForm({
             type="number"
             min={1}
             required
+            disabled={pending}
             defaultValue={defaultMatchDuration}
             className="bg-court-50"
           />
@@ -94,6 +98,7 @@ export default function CreateBracketForm({
             type="number"
             min={0}
             required
+            disabled={pending}
             defaultValue={defaultRestDuration}
             className="bg-court-50"
           />
@@ -108,7 +113,8 @@ export default function CreateBracketForm({
             type="number"
             min={1}
             required
-            defaultValue={1}
+            disabled={pending}
+            defaultValue={defaultCourtsCount}
             className="bg-court-50"
           />
         </div>
@@ -142,6 +148,7 @@ export default function CreateBracketForm({
                     name={`break_label_${i}`}
                     placeholder="cth: Maghrib"
                     defaultValue=""
+                    disabled={pending}
                     className="bg-white text-xs h-9"
                   />
                 </div>
@@ -151,6 +158,8 @@ export default function CreateBracketForm({
                     type="time"
                     name={`break_start_${i}`}
                     defaultValue="12:00"
+                    autoComplete="off"
+                    disabled={pending}
                     className="flex h-9 w-full rounded-lg border border-court-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
@@ -160,6 +169,8 @@ export default function CreateBracketForm({
                     type="time"
                     name={`break_end_${i}`}
                     defaultValue="13:00"
+                    autoComplete="off"
+                    disabled={pending}
                     className="flex h-9 w-full rounded-lg border border-court-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
@@ -178,7 +189,7 @@ export default function CreateBracketForm({
         </div>
       </div>
 
-      <input type="hidden" name="break_count" value={breaks.length} />
+      <input type="hidden" name="break_count" value={breaks.length} autoComplete="off" />
 
       <p className="rounded-xl border border-court-100 bg-court-50 px-4 py-3 text-xs text-ink-500">
         Jam setiap babak berikutnya akan dihitung otomatis berdasarkan jumlah lapangan: pertandingan

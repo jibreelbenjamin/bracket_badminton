@@ -135,6 +135,7 @@ function EditParticipantButton({
               name="name"
               type="text"
               required
+              disabled={pending}
               defaultValue={participant.name}
               className="bg-court-50"
             />
@@ -147,6 +148,7 @@ function EditParticipantButton({
               id={`edit-club-${participant.id}`}
               name="club_name"
               type="text"
+              disabled={pending}
               defaultValue={participant.club_name ?? ""}
               className="bg-court-50"
             />
