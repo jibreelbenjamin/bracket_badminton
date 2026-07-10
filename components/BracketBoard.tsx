@@ -226,5 +226,5 @@ function pairIndices(count: number): [number, number][] {
 }
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
 }

@@ -7,7 +7,7 @@ import { setWinnerAction } from "@/app/brackets/[id]/actions";
 import type { MatchRow, Participant } from "@/lib/types";
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
 }
 
 export default function MatchBox({

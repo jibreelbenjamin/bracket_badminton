@@ -34,7 +34,7 @@ export default function CreateBracketForm({
   }, [state]);
 
   const today = new Date();
-  const defaultDate = today.toISOString().slice(0, 10);
+  const defaultDate = today.toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
 
   function addBreak() {
     setBreaks((prev) => [...prev, { id: nextBreakId() }]);

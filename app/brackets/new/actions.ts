@@ -56,7 +56,7 @@ export async function createBracketAction(_prevState: ActionState, formData: For
     }
   }
 
-  const startTime = new Date(`${date}T${time}:00`);
+  const startTime = new Date(`${date}T${time}:00+07:00`);
   if (Number.isNaN(startTime.getTime())) {
     return { error: "Format tanggal/jam mulai tidak valid." };
   }

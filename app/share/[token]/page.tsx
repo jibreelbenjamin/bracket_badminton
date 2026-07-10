@@ -52,6 +52,7 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
           {new Date(bracket.start_time).toLocaleString("id-ID", {
             dateStyle: "full",
             timeStyle: "short",
+            timeZone: "Asia/Jakarta",
           })}{" "}
           &middot; {bracket.match_duration_minutes} menit/babak &middot; istirahat{" "}
           {bracket.rest_duration_minutes} menit &middot; {bracket.courts_count ?? 1} lapangan

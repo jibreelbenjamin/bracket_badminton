@@ -418,7 +418,7 @@ export async function updateBracketScheduleAction(
     }
   }
 
-  const startTime = new Date(`${date}T${time}:00`);
+  const startTime = new Date(`${date}T${time}:00+07:00`);
   if (Number.isNaN(startTime.getTime())) return { error: "Format tanggal/jam tidak valid." };
 
   const supabase = getSupabaseServer();

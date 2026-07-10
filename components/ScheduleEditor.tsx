@@ -61,8 +61,13 @@ export default function ScheduleEditor({
   }, [pending, setBracketLoading]);
 
   const start = new Date(bracket.start_time);
-  const defaultDate = start.toISOString().slice(0, 10);
-  const defaultTime = start.toTimeString().slice(0, 5);
+  const defaultDate = start.toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
+  const defaultTime = start.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+    hour12: false,
+  });
 
   function addBreak() {
     setBreaks((prev) => [...prev, { id: nextBreakId() }]);

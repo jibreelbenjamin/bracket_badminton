@@ -46,6 +46,7 @@ export default function BracketList({ brackets }: { brackets: Bracket[] }) {
                   {new Date(b.start_time).toLocaleString("id-ID", {
                     dateStyle: "full",
                     timeStyle: "short",
+                    timeZone: "Asia/Jakarta",
                   })}
                 </p>
                 <p className="text-xs text-ink-300 mt-1">
