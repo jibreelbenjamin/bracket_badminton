@@ -174,6 +174,54 @@ function avoidBreakOverlap(
 }
 
 /**
+ * Menghitung waktu mulai untuk setiap gelombang (wave) dalam satu babak,
+ * dengan memperhitungkan waktu istirahat khusus di antara gelombang.
+ *
+ * Jika sebuah gelombang akan tumpang-tindih dengan break time (misalnya
+ * jam istirahat khusus 17:30-18:00), gelombang tersebut dan gelombang
+ * berikutnya DIMUNDURKAN hingga setelah break selesai — BUKAN seluruh babak.
+ *
+ * Contoh dengan 3 lapangan, durasi 25 menit, istirahat 5 menit:
+ *   Wave 0: 16:00-16:25
+ *   Wave 1: 16:30-16:55
+ *   Wave 2: 17:00-17:25
+ *   -- istirahat khusus 17:30-18:00 --
+ *   Wave 3: 18:00-18:25  (dimundurkan)
+ *   Wave 4: 18:30-18:55
+ *
+ * @returns Array waktu mulai untuk setiap gelombang (indeks 0 = wave pertama)
+ */
+function computeWaveStartTimes(
+  startTime: Date,
+  waves: number,
+  matchDurationMinutes: number,
+  restDurationMinutes: number,
+  breaks: { startMin: number; endMin: number }[]
+): Date[] {
+  const waveStarts: Date[] = [];
+  let cursor = new Date(startTime);
+
+  for (let w = 0; w < waves; w++) {
+    // Lewati break time jika cursor jatuh di dalamnya
+    cursor = skipBreakIfInside(cursor, breaks);
+
+    // Cek apakah gelombang ini (cursor → cursor+durasi) tumpang-tindih dengan break
+    let adjusted = avoidBreakOverlap(cursor, matchDurationMinutes, breaks);
+    while (adjusted.getTime() !== cursor.getTime()) {
+      cursor = adjusted;
+      adjusted = avoidBreakOverlap(cursor, matchDurationMinutes, breaks);
+    }
+
+    waveStarts.push(new Date(cursor));
+
+    // Maju ke gelombang berikutnya: durasi pertandingan + durasi istirahat
+    cursor = new Date(cursor.getTime() + (matchDurationMinutes + restDurationMinutes) * 60_000);
+  }
+
+  return waveStarts;
+}
+
+/**
  * Menghitung rentang jam (mulai - selesai) untuk setiap babak berdasarkan
  * jam mulai turnamen, durasi pertandingan per babak, waktu istirahat,
  * jumlah lapangan, dan daftar waktu istirahat khusus (break_times seperti
@@ -184,7 +232,9 @@ function avoidBreakOverlap(
  * ada 2 gelombang: 3 pertandingan jalan bersamaan, lalu istirahat, lalu
  * 3 pertandingan berikutnya.
  *
- * Durasi satu babak = waves × match_duration + (waves−1) × rest_duration
+ * Setiap GELOMBANG (bukan babak) diperiksa terhadap break time. Jika
+ * sebuah gelombang bentrok dengan break time, hanya gelombang itu yang
+ * dimundurkan — gelombang sebelumnya tetap jalan seperti biasa.
  */
 export function computeRoundSchedule(
   bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes" | "courts_count">,
@@ -205,25 +255,25 @@ export function computeRoundSchedule(
       cursor = new Date(cursor.getTime() + bracket.rest_duration_minutes * 60_000);
     }
 
-    // Lewati break time jika cursor jatuh di dalamnya
-    cursor = skipBreakIfInside(cursor, breaks);
-
     // Hitung jumlah pertandingan & gelombang di babak ini
     const matchesInRound = Math.floor(bracketSize / Math.pow(2, r));
     const courts = Math.max(1, bracket.courts_count);
     const waves = Math.ceil(matchesInRound / courts);
-    const roundDuration = waves * bracket.match_duration_minutes + Math.max(0, waves - 1) * bracket.rest_duration_minutes;
 
-    // Pastikan seluruh durasi babak tidak tumpang-tindih dengan break time
-    // (loop untuk menangani beberapa break berturut-turut)
-    let adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
-    while (adjusted.getTime() !== cursor.getTime()) {
-      cursor = adjusted;
-      adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
-    }
+    // Hitung waktu mulai setiap gelombang dengan memperhitungkan break time
+    // di antara gelombang (bukan di level babak)
+    const waveStarts = computeWaveStartTimes(
+      cursor,
+      waves,
+      bracket.match_duration_minutes,
+      bracket.rest_duration_minutes,
+      breaks
+    );
 
-    const start = new Date(cursor);
-    const end = new Date(start.getTime() + roundDuration * 60_000);
+    const start = waveStarts[0];
+    const lastWaveStart = waveStarts[waves - 1];
+    const end = new Date(lastWaveStart.getTime() + bracket.match_duration_minutes * 60_000);
+
     schedule.push({ round: r, start, end });
     cursor = end;
   }
@@ -286,15 +336,78 @@ export function computeRoundScheduleMultiDay(
     }
   }
 
-  // Auto-distribute babak yang belum di-assign ke hari secara sekuensial
-  // (babak awal di hari awal, dst.)
-  let autoDayIdx = 0;
+  // Auto-distribute babak yang belum di-assign: isi hari pertama sampai
+  // jam-nya penuh (tidak muat babak berikutnya), baru lanjut ke hari berikutnya.
+  let currentDayIdx = 0;
   for (let r = 1; r <= totalRounds; r++) {
     if (assignedRounds.has(r)) continue;
-    // Cari hari yang masih belum penuh (simple: rotasi)
-    const day = sortedDays[autoDayIdx % sortedDays.length];
-    dayRounds.get(day.id)!.push(r);
-    autoDayIdx++;
+
+    // Cari hari yang masih cukup untuk menampung babak ini
+    let placed = false;
+    for (let attempt = 0; attempt < sortedDays.length; attempt++) {
+      const candidateDay = sortedDays[(currentDayIdx + attempt) % sortedDays.length];
+      const existingRounds = dayRounds.get(candidateDay.id) ?? [];
+
+      if (existingRounds.length === 0) {
+        // Hari kosong → pasti muat (minimal 1 babak)
+        existingRounds.push(r);
+        dayRounds.set(candidateDay.id, existingRounds);
+        currentDayIdx = (currentDayIdx + attempt) % sortedDays.length;
+        placed = true;
+        break;
+      }
+
+      // Simulasikan: apakah babak r muat di hari ini setelah babak terakhir yang sudah dijadwalkan?
+      const dayEndMin = timeStrToMinutes(candidateDay.end_time_str);
+
+      // Hitung estimasi waktu selesai babak r jika ditaruh setelah babak terakhir hari ini
+      const lastRound = existingRounds[existingRounds.length - 1];
+      const matchesInLastRound = Math.floor(bracketSize / Math.pow(2, lastRound));
+      const courts = Math.max(1, bracket.courts_count);
+      const wavesLastRound = Math.ceil(matchesInLastRound / courts);
+      const lastRoundDuration = wavesLastRound * bracket.match_duration_minutes
+        + Math.max(0, wavesLastRound - 1) * bracket.rest_duration_minutes;
+
+      // Estimasi: mulai setelah babak terakhir + istirahat
+      const dayStartMin = timeStrToMinutes(candidateDay.start_time_str);
+      let estimatedStartMin = dayStartMin;
+      for (const er of existingRounds) {
+        const matchesER = Math.floor(bracketSize / Math.pow(2, er));
+        const wavesER = Math.ceil(matchesER / courts);
+        const durationER = wavesER * bracket.match_duration_minutes
+          + Math.max(0, wavesER - 1) * bracket.rest_duration_minutes;
+        estimatedStartMin += durationER;
+        if (er !== existingRounds[existingRounds.length - 1]) {
+          estimatedStartMin += bracket.rest_duration_minutes;
+        }
+      }
+      estimatedStartMin += bracket.rest_duration_minutes; // istirahat antar babak
+
+      // Estimasi durasi babak r
+      const matchesR = Math.floor(bracketSize / Math.pow(2, r));
+      const wavesR = Math.ceil(matchesR / courts);
+      const durationR = wavesR * bracket.match_duration_minutes
+        + Math.max(0, wavesR - 1) * bracket.rest_duration_minutes;
+      const estimatedEndMin = estimatedStartMin + durationR;
+
+      if (estimatedEndMin <= dayEndMin) {
+        // Muat! Taruh di hari ini
+        existingRounds.push(r);
+        dayRounds.set(candidateDay.id, existingRounds);
+        currentDayIdx = (currentDayIdx + attempt) % sortedDays.length;
+        placed = true;
+        break;
+      }
+      // Tidak muat, coba hari berikutnya
+    }
+
+    // Fallback: jika tidak ada hari yang muat (seharusnya jarang), taruh di hari terakhir
+    if (!placed) {
+      const lastDay = sortedDays[currentDayIdx % sortedDays.length];
+      const existingRounds = dayRounds.get(lastDay.id) ?? [];
+      existingRounds.push(r);
+      dayRounds.set(lastDay.id, existingRounds);
+    }
   }
 
   // Urutkan babak dalam setiap hari berdasarkan round_number
@@ -319,32 +432,34 @@ export function computeRoundScheduleMultiDay(
     let cursor = new Date(`${day.date}T${day.start_time_str}:00+07:00`);
 
     for (const roundNum of rounds) {
-      // Lewati break time jika cursor jatuh di dalamnya
-      cursor = skipBreakIfInside(cursor, breaks);
-
       const matchesInRound = Math.floor(bracketSize / Math.pow(2, roundNum));
       const waves = Math.ceil(matchesInRound / courts);
-      const roundDuration = waves * matchDuration + Math.max(0, waves - 1) * restDuration;
 
-      // Pastikan babak tidak tumpang tindih dengan break time
-      let adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
-      while (adjusted.getTime() !== cursor.getTime()) {
-        cursor = adjusted;
-        adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
-      }
+      // Hitung waktu mulai setiap gelombang dengan memperhitungkan break time
+      // di antara gelombang (bukan di level babak)
+      const waveStarts = computeWaveStartTimes(
+        cursor,
+        waves,
+        matchDuration,
+        restDuration,
+        breaks
+      );
+
+      const start = waveStarts[0];
+      const lastWaveStart = waveStarts[waves - 1];
+      const end = new Date(lastWaveStart.getTime() + matchDuration * 60_000);
 
       // Cek apakah babak masih muat di hari ini (sebelum end_time_str)
-      const cursorMin = cursor.getHours() * 60 + cursor.getMinutes();
-      if (cursorMin + roundDuration > dayEndMin && typeof window === "undefined") {
-        // Babak tidak muat di hari ini — log warning di server saja
+      const endMin = end.getHours() * 60 + end.getMinutes();
+      if (endMin > dayEndMin && typeof window === "undefined") {
+        const roundDuration = endMin - (start.getHours() * 60 + start.getMinutes());
+        const cursorMin = start.getHours() * 60 + start.getMinutes();
         console.warn(
           `Babak ${roundNum} pada hari ${day.date} melebihi jam selesai (${day.end_time_str}). ` +
           `Dibutuhkan ${roundDuration} menit, hanya tersisa ${dayEndMin - cursorMin} menit.`
         );
       }
 
-      const start = new Date(cursor);
-      const end = new Date(start.getTime() + roundDuration * 60_000);
       schedule.push({ round: roundNum, start, end });
       cursor = end;
 
@@ -392,11 +507,25 @@ export function generateMatchesForBracket(
   let currentIsBye: boolean[] = slots.map((s) => s === null);
 
   for (let r = 1; r <= totalRounds; r++) {
-    const roundSchedule = schedule[r - 1];
     const matchesInRound = currentSlots.length / 2;
     const courts = Math.max(1, bracket.courts_count);
-    const waveSlotMs = (bracket.match_duration_minutes + bracket.rest_duration_minutes) * 60_000;
+    const waves = Math.ceil(matchesInRound / courts);
     const nextSlots: Slot[] = [];
+
+    // Konversi breakTimes ke format menit untuk computeWaveStartTimes
+    const breakMins = breakTimes.map((b) => ({
+      startMin: timeStrToMinutes(b.start_time_str),
+      endMin: timeStrToMinutes(b.end_time_str),
+    }));
+
+    // Hitung waktu mulai aktual setiap gelombang (sudah memperhitungkan break time)
+    const waveStartTimes = computeWaveStartTimes(
+      schedule[r - 1].start,
+      waves,
+      bracket.match_duration_minutes,
+      bracket.rest_duration_minutes,
+      breakMins
+    );
 
     for (let m = 0; m < matchesInRound; m++) {
       const p1 = currentSlots[m * 2];
@@ -410,9 +539,9 @@ export function generateMatchesForBracket(
         else if (isBye2 && p1) winner = p1;
       }
 
-      // Hitung waktu per-gelombang (wave)
+      // Gunakan waktu mulai gelombang yang sudah disesuaikan dengan break time
       const wave = Math.floor(m / courts);
-      const waveStart = new Date(roundSchedule.start.getTime() + wave * waveSlotMs);
+      const waveStart = waveStartTimes[wave];
       const waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
 
       matches.push({
@@ -479,9 +608,14 @@ export function recomputeMatchTimes(
   }
 
   const courts = Math.max(1, bracket.courts_count);
-  const waveSlotMs = (bracket.match_duration_minutes + bracket.rest_duration_minutes) * 60_000;
 
   const result = new Map<string, { start_time: string; end_time: string }>();
+
+  // Konversi breakTimes ke format menit untuk computeWaveStartTimes
+  const breakMins = breakTimes.map((b) => ({
+    startMin: timeStrToMinutes(b.start_time_str),
+    endMin: timeStrToMinutes(b.end_time_str),
+  }));
 
   // Group matches by round
   const byRound = new Map<number, typeof matches>();
@@ -494,9 +628,21 @@ export function recomputeMatchTimes(
     const roundSchedule = roundScheduleMap.get(roundNum);
     if (!roundSchedule) continue;
 
+    // Hitung jumlah gelombang di babak ini
+    const waves = Math.ceil(roundMatches.length / courts);
+
+    // Hitung waktu mulai aktual setiap gelombang (sudah memperhitungkan break time)
+    const waveStartTimes = computeWaveStartTimes(
+      roundSchedule.start,
+      waves,
+      bracket.match_duration_minutes,
+      bracket.rest_duration_minutes,
+      breakMins
+    );
+
     for (const match of roundMatches) {
       const wave = Math.floor(match.match_index / courts);
-      const waveStart = new Date(roundSchedule.start.getTime() + wave * waveSlotMs);
+      const waveStart = waveStartTimes[wave];
       const waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
 
       result.set(match.id, {

@@ -20,11 +20,13 @@ export function DatePicker({
   defaultValue,
   disabled,
   className,
+  onChange,
 }: {
   name: string;
   defaultValue?: string;
   disabled?: boolean;
   className?: string;
+  onChange?: (value: string) => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const [date, setDate] = React.useState<Date | undefined>(
@@ -58,6 +60,7 @@ export function DatePicker({
           onSelect={(value) => {
             setDate(value);
             setOpen(false);
+            if (value) onChange?.(formatIsoDate(value));
           }}
           defaultMonth={date}
           locale={localeId}

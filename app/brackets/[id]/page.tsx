@@ -10,6 +10,7 @@ import BracketBoard from "@/components/BracketBoard";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import BracketNameEditor from "@/components/BracketNameEditor";
 import ParticipantChangeAlert from "@/components/ParticipantChangeAlert";
+import ScheduleReminderAlert from "@/components/ScheduleReminderAlert";
 import { BracketLoadingProvider } from "@/components/BracketLoadingProvider";
 import BracketLoadingOverlay from "@/components/BracketLoadingOverlay";
 
@@ -92,6 +93,11 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
 
   const participantChanges = detectParticipantChanges(participantList, matchList);
 
+  // Cek apakah ada babak yang belum ditugaskan ke hari tertentu
+  const assignedRounds = new Set(roundAssignmentList.map((ra) => ra.round_number));
+  const matchRounds = new Set(matchList.map((m) => m.round_number));
+  const hasUnassignedRounds = [...matchRounds].some((r) => !assignedRounds.has(r));
+
   return (
     <main className="max-w-6xl mx-auto px-6 py-10">
       <BracketLoadingProvider>
@@ -134,7 +140,7 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
                   >
                     Hari {i + 1}: {new Date(sd.date + "T00:00:00").toLocaleDateString("id-ID", {
                       day: "numeric",
-                      month: "short",
+                      month: "long",
                       timeZone: "Asia/Jakarta",
                     })} ({sd.start_time_str}–{sd.end_time_str})
                   </span>
@@ -179,6 +185,17 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
               bracketId={bracket.id}
               newCount={participantChanges.newCount}
               removedCount={participantChanges.removedCount}
+            />
+          </div>
+        )}
+
+        {matchList.length > 0 && scheduleDayList.length > 1 && (
+          <div className="mb-6">
+            <ScheduleReminderAlert
+              bracketId={bracket.id}
+              scheduleDayCount={scheduleDayList.length}
+              hasMatches={matchList.length > 0}
+              hasUnassignedRounds={hasUnassignedRounds}
             />
           </div>
         )}

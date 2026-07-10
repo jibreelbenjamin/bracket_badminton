@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 import { updateBracketScheduleAction } from "@/app/brackets/[id]/actions";
 import type { Bracket, BreakTime, ScheduleDay, RoundAssignment, MatchRow } from "@/lib/types";
 import { roundLabel } from "@/lib/bracket-logic";
@@ -41,6 +43,12 @@ function formatDateStr(isoDateStr: string): string {
   return isoDateStr.slice(0, 10);
 }
 
+function formatDisplayDate(isoDateStr: string): string {
+  const [y, m, d] = isoDateStr.split("-").map(Number);
+  if (!y || !m || !d) return isoDateStr;
+  return format(new Date(y, m - 1, d), "d MMM", { locale: localeId });
+}
+
 export default function ScheduleEditor({
   bracket,
   breakTimes,
@@ -54,6 +62,9 @@ export default function ScheduleEditor({
   roundAssignments: RoundAssignment[];
   matches: MatchRow[];
 }) {
+  const today = new Date();
+  const defaultDate = today.toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
+
   const [open, setOpen] = useState(false);
   const boundAction = updateBracketScheduleAction.bind(null, bracket.id);
   const [state, formAction, pending] = useActionState(boundAction, undefined);
@@ -81,6 +92,13 @@ export default function ScheduleEditor({
     return map;
   });
 
+  // Track current date/start/end times for each day (for display in round assignment dropdown)
+  const [dayInfo, setDayInfo] = useState<{ date: string; start: string; end: string }[]>(() =>
+    scheduleDays.length > 0
+      ? scheduleDays.map((sd) => ({ date: formatDateStr(sd.date), start: sd.start_time_str, end: sd.end_time_str }))
+      : [{ date: defaultDate, start: "08:00", end: "21:00" }]
+  );
+
   // Sync local state with props when dialog opens, so old values are preserved
   // and not replaced by automatic defaults.
   useEffect(() => {
@@ -90,6 +108,11 @@ export default function ScheduleEditor({
         scheduleDays.length > 0
           ? scheduleDays.map(() => ({ id: nextDayId() }))
           : [{ id: nextDayId() }]
+      );
+      setDayInfo(
+        scheduleDays.length > 0
+          ? scheduleDays.map((sd) => ({ date: formatDateStr(sd.date), start: sd.start_time_str, end: sd.end_time_str }))
+          : [{ date: defaultDate, start: "08:00", end: "21:00" }]
       );
       const map = new Map<number, number>();
       for (const ra of roundAssignments) {
@@ -131,11 +154,38 @@ export default function ScheduleEditor({
 
   function addDay() {
     setDays((prev) => [...prev, { id: nextDayId() }]);
+    setDayInfo((prev) => [...prev, { date: defaultDate, start: "08:00", end: "21:00" }]);
   }
 
   function removeDay(id: number) {
     if (days.length <= 1) return;
+    const idx = days.findIndex((d) => d.id === id);
     setDays((prev) => prev.filter((d) => d.id !== id));
+    setDayInfo((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateDayDate(index: number, value: string) {
+    setDayInfo((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], date: value };
+      return next;
+    });
+  }
+
+  function updateDayStart(index: number, value: string) {
+    setDayInfo((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], start: value };
+      return next;
+    });
+  }
+
+  function updateDayEnd(index: number, value: string) {
+    setDayInfo((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], end: value };
+      return next;
+    });
   }
 
   function handleRoundAssignment(roundNumber: number, dayIndex: number) {
@@ -144,25 +194,26 @@ export default function ScheduleEditor({
     setRoundAssignMap(newMap);
   }
 
-  const today = new Date();
-  const defaultDate = today.toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="text-xs text-ink-500 underline underline-offset-2 hover:text-court-700">
+        <button
+          id="schedule-dialog-trigger"
+          className="text-xs text-ink-500 underline underline-offset-2 hover:text-court-700"
+        >
           Ubah jadwal
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-xl max-h-[85vh] !flex !flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
           <DialogTitle>Ubah Jadwal Turnamen</DialogTitle>
           <DialogDescription>
             Atur hari pelaksanaan, jam, durasi, dan penugasan babak ke setiap hari.
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="contents">
+          <div className="space-y-4 px-6 py-4 overflow-y-auto flex-1 min-h-0">
           {/* Multi-Day Schedule */}
           <div className="rounded-lg border border-court-100 bg-court-50/50 p-3">
             <div className="flex items-center justify-between mb-2">
@@ -190,6 +241,7 @@ export default function ScheduleEditor({
                           name={`day_date_${i}`}
                           defaultValue={existingDay ? formatDateStr(existingDay.date) : defaultDate}
                           disabled={pending}
+                          onChange={(val) => updateDayDate(i, val)}
                         />
                       </div>
                       <div>
@@ -198,6 +250,7 @@ export default function ScheduleEditor({
                           name={`day_start_${i}`}
                           defaultValue={existingDay?.start_time_str ?? "08:00"}
                           disabled={pending}
+                          onChange={(val) => updateDayStart(i, val)}
                         />
                       </div>
                       <div>
@@ -206,6 +259,7 @@ export default function ScheduleEditor({
                           name={`day_end_${i}`}
                           defaultValue={existingDay?.end_time_str ?? "21:00"}
                           disabled={pending}
+                          onChange={(val) => updateDayEnd(i, val)}
                         />
                       </div>
                     </div>
@@ -230,7 +284,10 @@ export default function ScheduleEditor({
 
           {/* Round-to-Day Assignment */}
           {rounds.length > 0 && days.length > 1 && (
-            <div className="rounded-lg border border-court-100 bg-court-50/50 p-3">
+            <div
+              id="round-assignment-section"
+              className="rounded-lg border border-court-100 bg-court-50/50 p-3"
+            >
               <Label className="text-xs text-ink-700 font-medium block mb-2">
                 Penugasan Babak ke Hari
               </Label>
@@ -264,11 +321,15 @@ export default function ScheduleEditor({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="auto">Otomatis</SelectItem>
-                          {days.map((_, idx) => (
-                            <SelectItem key={idx} value={String(idx)}>
-                              Hari {idx + 1}
-                            </SelectItem>
-                          ))}
+                          {days.map((_, idx) => {
+                            const di = dayInfo[idx] ?? { date: defaultDate, start: "08:00", end: "21:00" };
+                            const dateLabel = formatDisplayDate(di.date);
+                            return (
+                              <SelectItem key={idx} value={String(idx)}>
+                                Hari ke-{idx + 1}, {dateLabel} {di.start}–{di.end}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     </div>
@@ -400,7 +461,9 @@ export default function ScheduleEditor({
             </div>
           ))}
 
-          <DialogFooter>
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t border-court-100 bg-white shrink-0 rounded-b-lg">
             <Button type="submit" disabled={pending}>
               {pending ? "Menyimpan..." : "Simpan Jadwal"}
             </Button>

@@ -85,7 +85,7 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
               >
                 Hari {i + 1}: {new Date(sd.date + "T00:00:00").toLocaleDateString("id-ID", {
                   day: "numeric",
-                  month: "short",
+                  month: "long",
                   timeZone: "Asia/Jakarta",
                 })} ({sd.start_time_str}–{sd.end_time_str})
               </span>
@@ -123,15 +123,6 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
           </p>
         </div>
       )}
-
-      <div className="mt-10 pt-6 border-t border-court-200 text-center">
-        <p className="text-xs text-ink-300">
-          Dibagikan melalui{" "}
-          <Link href="/" className="underline hover:text-court-700 transition-colors">
-            Bracket Badminton
-          </Link>
-        </p>
-      </div>
     </main>
   );
 }

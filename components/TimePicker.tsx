@@ -18,11 +18,13 @@ export function TimePicker({
   defaultValue,
   disabled,
   className,
+  onChange,
 }: {
   name: string;
   defaultValue?: string;
   disabled?: boolean;
   className?: string;
+  onChange?: (value: string) => void;
 }) {
   const [defaultHour, defaultMinute] = (defaultValue ?? "08:00").split(":");
   const [hour, setHour] = React.useState(defaultHour || "08");
@@ -30,12 +32,22 @@ export function TimePicker({
 
   const value = `${hour}:${minute}`;
 
+  const handleHourChange = (h: string) => {
+    setHour(h);
+    onChange?.(`${h}:${minute}`);
+  };
+
+  const handleMinuteChange = (m: string) => {
+    setMinute(m);
+    onChange?.(`${hour}:${m}`);
+  };
+
   return (
     <div className={className}>
       <input type="hidden" name={name} value={value} autoComplete="off" />
       {/* Mobile: stack vertikal; Desktop: sejajar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
-        <Select value={hour} onValueChange={setHour} disabled={disabled}>
+        <Select value={hour} onValueChange={handleHourChange} disabled={disabled}>
           <SelectTrigger className="w-full bg-court-50 h-9 sm:h-10 text-sm">
             <SelectValue />
           </SelectTrigger>
@@ -48,7 +60,7 @@ export function TimePicker({
           </SelectContent>
         </Select>
         <span className="hidden sm:inline text-ink-500 text-sm">:</span>
-        <Select value={minute} onValueChange={setMinute} disabled={disabled}>
+        <Select value={minute} onValueChange={handleMinuteChange} disabled={disabled}>
           <SelectTrigger className="w-full bg-court-50 h-9 sm:h-10 text-sm">
             <SelectValue />
           </SelectTrigger>

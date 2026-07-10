@@ -105,6 +105,16 @@ export default function BracketBoard({
 
   const participantMap = useMemo(() => new Map(participants.map((p) => [p.id, p])), [participants]);
 
+  // Hitung nomor pertandingan global (diurut berdasarkan round_number lalu match_index)
+  const matchNumberMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let counter = 1;
+    for (const m of matches) {
+      map.set(m.id, counter++);
+    }
+    return map;
+  }, [matches]);
+
   const roundsMap = useMemo(() => {
     const map = new Map<number, MatchRow[]>();
     for (const m of matches) {
@@ -152,7 +162,10 @@ export default function BracketBoard({
       className={isFullscreen ? "h-full overflow-auto bg-court-50 p-8" : ""}
     >
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
-        <h2 className="text-lg font-display font-bold text-court-900">Bagan Pertandingan</h2>
+        <div>
+          <h2 className="text-lg font-display font-bold text-court-900">Bagan Pertandingan</h2>
+          <p className="text-sm text-ink-500">{bracket.name}</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={toggleFullscreen}>
             {isFullscreen ? (
@@ -162,14 +175,18 @@ export default function BracketBoard({
             )}
             {isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh"}
           </Button>
-          <ShareBracketButton bracketId={bracket.id} currentShareToken={bracket.share_token} />
-          <Button
-            onClick={handleExport}
-            disabled={exporting}
-            className="bg-court-900 hover:bg-ink-900"
-          >
-            {exporting ? "Menyiapkan gambar..." : "⬇ Unduh Gambar (HD)"}
-          </Button>
+          {!isFullscreen && !readonly && (
+            <ShareBracketButton bracketId={bracket.id} currentShareToken={bracket.share_token} />
+          )}
+          {!isFullscreen && (
+            <Button
+              onClick={handleExport}
+              disabled={exporting}
+              className="bg-court-900 hover:bg-ink-900"
+            >
+              {exporting ? "Menyiapkan gambar..." : "⬇ Unduh Gambar (HD)"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -231,9 +248,9 @@ export default function BracketBoard({
                   {roundDayMap.has(roundNum) && (
                     <div className="round-day text-[10px] text-court-600 mt-0.5">
                       {new Date(roundDayMap.get(roundNum)!.date + "T00:00:00").toLocaleDateString("id-ID", {
-                        weekday: "short",
+                        weekday: "long",
                         day: "numeric",
-                        month: "short",
+                        month: "long",
                         timeZone: "Asia/Jakarta",
                       })}
                     </div>
@@ -252,6 +269,7 @@ export default function BracketBoard({
                         p2={match.participant2_id ? participantMap.get(match.participant2_id) ?? null : null}
                         style={{ top: center - BOX_HEIGHT / 2, height: BOX_HEIGHT }}
                         readonly={readonly}
+                        matchNumber={matchNumberMap.get(match.id)}
                       />
                     );
                   })}

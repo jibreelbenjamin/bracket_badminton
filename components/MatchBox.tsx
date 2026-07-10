@@ -25,6 +25,7 @@ export default function MatchBox({
   p2,
   style,
   readonly = false,
+  matchNumber,
 }: {
   bracketId: string;
   match: MatchRow;
@@ -32,6 +33,7 @@ export default function MatchBox({
   p2: Participant | null;
   style: React.CSSProperties;
   readonly?: boolean;
+  matchNumber?: number;
 }) {
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -67,8 +69,10 @@ export default function MatchBox({
     >
       <div className="match-time">
         {match.start_time && match.end_time
-          ? `${formatDate(match.start_time)},  ${formatTime(match.start_time)} - ${formatTime(match.end_time)}`
-          : ""}
+          ? <>{matchNumber != null ? <span className="font-extrabold">#{matchNumber} -</span> : null} {formatDate(match.start_time)},  {formatTime(match.start_time)}-{formatTime(match.end_time)}</>
+          : matchNumber != null
+            ? <span className="font-bold">#{matchNumber}</span>
+            : null}
       </div>
       {isPending && (
         <div className="match-box__loading-overlay">
