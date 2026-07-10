@@ -61,15 +61,14 @@ export default function CreateBracketForm({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label className="mb-1.5 block text-ink-700">Tanggal Mulai</Label>
-          <DatePicker name="date" defaultValue={defaultDate} disabled={pending} />
-        </div>
-        <div>
-          <Label className="mb-1.5 block text-ink-700">Jam Mulai (Babak 1)</Label>
-          <TimePicker name="time" defaultValue="08:00" disabled={pending} />
-        </div>
+      <div>
+        <Label className="mb-1.5 block text-ink-700">Tanggal Mulai</Label>
+        <DatePicker name="date" defaultValue={defaultDate} disabled={pending} />
+      </div>
+
+      <div>
+        <Label className="mb-1.5 block text-ink-700">Jam Mulai (Babak 1)</Label>
+        <TimePicker name="time" defaultValue="08:00" disabled={pending} />
       </div>
 
       <div className="grid grid-cols-3 gap-4">

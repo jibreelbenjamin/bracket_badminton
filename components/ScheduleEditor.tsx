@@ -62,7 +62,7 @@ export default function ScheduleEditor({
 
   const start = new Date(bracket.start_time);
   const defaultDate = start.toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
-  const defaultTime = start.toLocaleTimeString("id-ID", {
+  const defaultTime = start.toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Asia/Jakarta",
@@ -93,35 +93,22 @@ export default function ScheduleEditor({
         </DialogHeader>
 
         <form action={formAction} className="space-y-4">
+          {/* Row 1: Date */}
+          <div>
+            <Label className="mb-1 block text-xs text-ink-700">Tanggal Mulai</Label>
+            <DatePicker name="date" defaultValue={defaultDate} disabled={pending} />
+          </div>
+
+          {/* Row 2: Time (jam : menit) */}
+          <div>
+            <Label className="mb-1 block text-xs text-ink-700">Jam Mulai</Label>
+            <TimePicker name="time" defaultValue={defaultTime} disabled={pending} />
+          </div>
+
+          {/* Row 3: Durasi, Istirahat, Lapangan — satu baris */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <Label className="mb-1 block text-xs text-ink-700">Tanggal Mulai</Label>
-              <DatePicker name="date" defaultValue={defaultDate} disabled={pending} />
-            </div>
-            <div>
-              <Label className="mb-1 block text-xs text-ink-700">Jam Mulai</Label>
-              <TimePicker name="time" defaultValue={defaultTime} disabled={pending} />
-            </div>
-            <div>
-              <Label htmlFor="courts_count" className="mb-1 block text-xs text-ink-700">
-                Lapangan
-              </Label>
-              <Input
-                id="courts_count"
-                type="number"
-                name="courts_count"
-                min={1}
-                defaultValue={bracket.courts_count ?? 1}
-                required
-                disabled={pending}
-                className="bg-court-50"
-              />
-            </div>
-            <div>
-              <Label
-                htmlFor="match_duration_minutes"
-                className="mb-1 block text-xs text-ink-700"
-              >
+              <Label htmlFor="match_duration_minutes" className="mb-1 block text-xs text-ink-700">
                 Durasi/Babak (menit)
               </Label>
               <Input
@@ -137,7 +124,7 @@ export default function ScheduleEditor({
             </div>
             <div>
               <Label htmlFor="rest_duration_minutes" className="mb-1 block text-xs text-ink-700">
-                Istirahat (menit)
+                Durasi Istirahat (menit)
               </Label>
               <Input
                 id="rest_duration_minutes"
@@ -145,6 +132,21 @@ export default function ScheduleEditor({
                 name="rest_duration_minutes"
                 min={0}
                 defaultValue={bracket.rest_duration_minutes}
+                required
+                disabled={pending}
+                className="bg-court-50"
+              />
+            </div>
+            <div>
+              <Label htmlFor="courts_count" className="mb-1 block text-xs text-ink-700">
+                Jumlah Lapangan
+              </Label>
+              <Input
+                id="courts_count"
+                type="number"
+                name="courts_count"
+                min={1}
+                defaultValue={bracket.courts_count ?? 1}
                 required
                 disabled={pending}
                 className="bg-court-50"
