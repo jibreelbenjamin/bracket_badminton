@@ -1,8 +1,9 @@
 # 🏸 Bracket Badminton
 
 Aplikasi web untuk mengelola bagan (bracket) turnamen badminton: import peserta dari Excel,
-pengacakan otomatis (anti sesama PB di babak 1), penjadwalan jam otomatis per babak, pencatatan
-hasil pertandingan, dan unduh bagan sebagai gambar resolusi tinggi. Dibangun dengan **Next.js**
+pengacakan otomatis (anti sesama PB di babak 1), penjadwalan jam otomatis per babak, dukungan
+multi-lapangan, waktu istirahat khusus (misal: sholat), pencatatan hasil pertandingan, efek
+confetti saat final, dan unduh bagan sebagai gambar resolusi tinggi. Dibangun dengan **Next.js**
 (App Router) dan **Supabase** (Postgres) sebagai database. Tanpa sistem login rumit — cukup PIN
 4 digit.
 
@@ -11,7 +12,10 @@ hasil pertandingan, dan unduh bagan sebagai gambar resolusi tinggi. Dibangun den
 ## ✨ Fitur
 
 - **Banyak bracket** — buat turnamen sebanyak yang Anda mau, masing-masing berdiri sendiri.
-- **Import peserta via Excel** — cukup kolom **Nama** dan **Nama PB**.
+- **Import peserta via Excel** — cukup kolom **Nama** dan **Nama PB**. Tambah manual satu-satu
+  juga bisa lewat form.
+- **Edit nama bracket** — klik ikon pensil di halaman detail bracket untuk mengganti nama
+  turnamen kapan saja.
 - **Pengacakan pintar** — di babak 1, sistem berusaha keras supaya dua peserta dari **PB yang
   sama tidak bertemu**. Kalau ada satu PB yang jumlah pesertanya sangat dominan (lebih dari
   separuh total slot), sistem tetap membuat bagan sebaik mungkin dan memberi peringatan jika
@@ -21,10 +25,22 @@ hasil pertandingan, dan unduh bagan sebagai gambar resolusi tinggi. Dibangun den
 - **Jadwal jam otomatis** — Anda hanya mengisi jam mulai turnamen, durasi tiap babak, dan waktu
   istirahat antar babak. Jam seluruh babak (termasuk babak yang pesertanya belum diketahui)
   langsung dihitung di awal.
+- **Dukungan multi-lapangan** — tentukan jumlah lapangan yang tersedia, penjadwalan otomatis
+  akan mendistribusikan pertandingan ke seluruh lapangan secara paralel.
+- **Waktu istirahat khusus** — bisa menambahkan rentang waktu istirahat (contoh: waktu sholat
+  Jumat pukul 11:45–13:00) yang akan dihindari sistem saat menghitung jadwal pertandingan.
+  Istirahat ini berlaku berulang setiap hari selama turnamen berlangsung.
+- **Editor jadwal lengkap** — ubah jam mulai, durasi, jumlah lapangan, dan waktu istirahat
+  kapan saja dari halaman detail bracket melalui dialog yang mudah digunakan.
 - **Babak berikutnya tampil kosong ("—Menunggu—")** sampai pemenang babak sebelumnya dipilih;
   begitu diklik, otomatis maju ke kotak berikutnya.
+- **Efek confetti** 🎉 — saat pemenang final dipilih, efek confetti otomatis muncul sebagai
+  perayaan!
 - **Unduh gambar HD** — bagan lengkap bisa diunduh sebagai PNG resolusi tinggi (3x), siap
   dicetak atau dibagikan di grup WhatsApp.
+- **Log aktivitas server-side** — setiap aksi penting (login, buat/hapus bracket, generate
+  bagan, dll.) dicatat di database lengkap dengan IP, negara, dan browser. Log ini hanya
+  bisa diakses langsung dari Supabase, tidak ditampilkan di UI.
 - **Autentikasi PIN 4 digit** (bukan login akun) — PIN disimpan di database, bisa diganti dari
   halaman Pengaturan.
 
@@ -35,8 +51,13 @@ hasil pertandingan, dan unduh bagan sebagai gambar resolusi tinggi. Dibangun den
 - [Next.js 16](https://nextjs.org) (App Router, Server Actions, TypeScript)
 - [Supabase](https://supabase.com) (Postgres) — diakses lewat **Service Role Key** di server saja
 - [Tailwind CSS v4](https://tailwindcss.com)
+- [Radix UI](https://www.radix-ui.com) — komponen dialog, alert dialog, select, popover, label
+- [Lucide React](https://lucide.dev) — ikon
 - [xlsx (SheetJS)](https://www.npmjs.com/package/xlsx) untuk membaca file Excel
 - [html-to-image](https://github.com/bubkoo/html-to-image) untuk ekspor bagan ke PNG
+- [canvas-confetti](https://www.npmjs.com/package/canvas-confetti) untuk efek confetti 🎉
+- [date-fns](https://date-fns.org) untuk manipulasi tanggal
+- [Sonner](https://sonner.emilkowal.ski) untuk toast notification
 
 ---
 
@@ -46,14 +67,16 @@ hasil pertandingan, dan unduh bagan sebagai gambar resolusi tinggi. Dibangun den
 
 1. Buat proyek baru di [supabase.com](https://supabase.com).
 2. Buka **SQL Editor**, tempel seluruh isi file [`supabase/schema.sql`](./supabase/schema.sql),
-   lalu jalankan (Run). Ini akan membuat tabel `app_settings`, `brackets`, `participants`, dan
-   `matches`, sekaligus mengisi PIN default `8888`.
+   lalu jalankan (Run). Ini akan membuat tabel `app_settings`, `brackets`, `participants`,
+   `matches`, `break_times`, dan `activity_logs`, sekaligus mengisi PIN default `8888`.
 3. Buka **Project Settings → API**, catat:
    - **Project URL**
    - **service_role secret** (⚠️ bukan `anon` key — aplikasi ini sengaja hanya memakai
      service role key di server, supaya tidak perlu login Supabase Auth di browser)
 
 ### 2. Siapkan environment variables
+
+Salin `.env.example` (jika ada) atau buat file `.env.local`:
 
 ```bash
 cp .env.example .env.local
@@ -129,14 +152,17 @@ Aplikasi ini **tidak** memakai sistem login/akun. Sebagai gantinya:
 
 1. Jumlah peserta dibulatkan ke atas ke pangkat 2 terdekat (misal 11 peserta → bagan 16 slot,
    5 slot sisanya jadi BYE).
-2. Sistem mencoba ratusan kombinasi acak untuk susunan babak 1, memilih yang paling sedikit (idealnya nol) mempertemukan dua peserta dari PB yang sama, lalu melakukan penukaran lokal
+2. Sistem mencoba ratusan kombinasi acak untuk susunan babak 1, memilih yang paling sedikit
+   (idealnya nol) mempertemukan dua peserta dari PB yang sama, lalu melakukan penukaran lokal
    tambahan untuk membereskan sisa bentrokan yang mungkin masih ada.
 3. Peserta yang mendapat BYE otomatis dianggap menang dan langsung mengisi slot di babak
    berikutnya. Pertandingan lain di babak berikutnya tetap tampil kosong ("— Menunggu —") sampai
    hasil pertandingan sebenarnya dicatat.
-4. Jadwal jam **dihitung sekali di awal** berdasarkan jam mulai, durasi per babak, dan waktu
-   istirahat — bukan menunggu pertandingan sebelumnya benar-benar selesai. Ini supaya panitia
-   punya jadwal pasti dari awal untuk diumumkan ke peserta.
+4. Jadwal jam **dihitung sekali di awal** berdasarkan jam mulai, durasi per babak, waktu
+   istirahat, dan **jumlah lapangan** — pertandingan dalam satu babak didistribusikan secara
+   paralel ke seluruh lapangan yang tersedia. Waktu istirahat khusus (seperti sholat) juga
+   otomatis dihindari. Ini supaya panitia punya jadwal pasti dari awal untuk diumumkan ke
+   peserta.
 5. Menekan tombol **"Acak Ulang Bagan"** akan menghapus seluruh hasil pertandingan yang sudah
    tercatat dan membuat susunan baru — gunakan dengan hati-hati.
 
@@ -167,16 +193,37 @@ Aplikasi ini **tidak** memakai sistem login/akun. Sebagai gantinya:
 
 ```
 app/
-  login/            Halaman & aksi verifikasi PIN
-  dashboard/         Daftar semua bracket
-  brackets/new/       Form buat bracket baru
-  brackets/[id]/      Detail bracket: peserta, pengacakan, tampilan bagan
-  settings/           Ganti PIN & nilai default durasi
-components/           Komponen UI (form, tabel peserta, papan bagan, dll)
+  login/               Halaman & aksi verifikasi PIN
+  logout/              Aksi logout
+  dashboard/           Daftar semua bracket
+  brackets/new/        Form buat bracket baru
+  brackets/[id]/       Detail bracket: peserta, pengacakan, editor jadwal, tampilan bagan
+  settings/            Ganti PIN & nilai default (durasi, jumlah lapangan)
+components/
+  ui/                  Komponen UI dasar (button, dialog, input, select, dll.)
+  BracketBoard.tsx     Papan bagan utama dengan ekspor PNG
+  BracketList.tsx      Daftar bracket di dashboard
+  BracketNameEditor.tsx  Dialog ganti nama bracket
+  CreateBracketForm.tsx  Form buat bracket baru
+  AddParticipantForm.tsx      Form tambah peserta manual
+  ImportParticipantsForm.tsx  Form import peserta dari Excel
+  ParticipantsTable.tsx       Tabel daftar peserta
+  GenerateBracketButton.tsx   Tombol generate bagan
+  ScheduleEditor.tsx          Dialog editor jadwal (jam mulai, durasi, lapangan, istirahat)
+  DeleteBracketButton.tsx     Tombol hapus bracket
+  MatchBox.tsx                Kotak pertandingan individual di bagan
+  WinnerDialog.tsx            Dialog konfirmasi pemenang + efek confetti
+  ParticipantChangeAlert.tsx  Alert saat peserta berubah setelah bagan sudah jadi
+  NavigationProgress.tsx      Indikator progress langkah (peserta → jadwal → bagan)
+  DatePicker.tsx / TimePicker.tsx  Komponen input tanggal & jam
+  PinForm.tsx / LogoutButton.tsx    Komponen autentikasi
 lib/
-  bracket-logic.ts    Algoritma inti: pengacakan anti-sesama-PB, BYE, penjadwalan
+  bracket-logic.ts    Algoritma inti: pengacakan anti-sesama-PB, BYE, penjadwalan multi-lapangan
   excel.ts            Parser file Excel peserta
-  auth.ts             Sesi PIN (cookie bertanda tangan HMAC)
+  auth.ts             Manajemen sesi PIN (cookie bertanda tangan HMAC-SHA256)
+  activity-log.ts     Pencatatan log aktivitas server-side (IP, negara, browser)
+  types.ts            Definisi tipe TypeScript
+  utils.ts            Fungsi-fungsi utility
   supabase/server.ts  Klien Supabase (service role, server-only)
-supabase/schema.sql    Skema database — jalankan ini di Supabase SQL Editor
+supabase/schema.sql   Skema database — jalankan ini di Supabase SQL Editor
 ```

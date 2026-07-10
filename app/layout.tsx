@@ -26,7 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Suspense>
         <main className="flex-1">{children}</main>
         <footer className="text-center py-4 text-sm text-ink-300 border-t border-court-200/50">
-          <p>&copy; {new Date().getFullYear()} Jibreel Benjamin &mdash; v{process.env.NEXT_PUBLIC_APP_VERSION}</p>
+          <p>
+            &copy; {new Date().getFullYear()} Jibreel Benjamin
+            {process.env.NEXT_PUBLIC_APP_VERSION && (
+              <> &mdash; v{process.env.NEXT_PUBLIC_APP_VERSION}</>
+            )}
+          </p>
         </footer>
         <Toaster />
       </body>
