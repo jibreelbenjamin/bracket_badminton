@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
 import type { ActionState } from "@/lib/types";
 
 /** Validasi string HH:mm */
@@ -94,5 +95,6 @@ export async function createBracketAction(_prevState: ActionState, formData: For
     }
   }
 
+  await logActivity("create_bracket", `Membuat bracket: "${name}"`);
   redirect(`/brackets/${data.id}`);
 }

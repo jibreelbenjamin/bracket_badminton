@@ -4,12 +4,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { createSessionCookieValue, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
 import type { ActionState } from "@/lib/types";
 
 export async function loginAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const pin = String(formData.get("pin") ?? "").trim();
 
   if (!/^\d{4}$/.test(pin)) {
+    await logActivity("login_failed", "PIN format tidak valid");
     return { error: "PIN harus terdiri dari 4 digit angka." };
   }
 
@@ -17,10 +19,12 @@ export async function loginAction(_prevState: ActionState, formData: FormData): 
   const { data, error } = await supabase.from("app_settings").select("pin").eq("id", 1).single();
 
   if (error || !data) {
+    await logActivity("login_failed", "Gagal mengambil data PIN dari database");
     return { error: "Gagal memverifikasi PIN. Periksa koneksi Supabase aplikasi." };
   }
 
   if (data.pin !== pin) {
+    await logActivity("login_failed", "PIN salah");
     return { error: "PIN salah. Coba lagi." };
   }
 
@@ -33,5 +37,6 @@ export async function loginAction(_prevState: ActionState, formData: FormData): 
     maxAge: 60 * 60 * 12,
   });
 
+  await logActivity("login_success", "Login berhasil");
   redirect("/dashboard");
 }

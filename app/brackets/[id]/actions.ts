@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { parseParticipantsExcel } from "@/lib/excel";
 import { generateMatchesForBracket, nextRoundTarget } from "@/lib/bracket-logic";
+import { logActivity } from "@/lib/activity-log";
 import type { ActionState, Bracket, MatchRow, Participant } from "@/lib/types";
 
 export async function importParticipantsAction(
@@ -44,6 +45,7 @@ export async function importParticipantsAction(
   const { error } = await supabase.from("participants").insert(rows);
   if (error) return { error: error.message };
 
+  await logActivity("import_participants", `Mengimpor ${parsed.length} peserta ke bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
   return { success: `${parsed.length} pasangan peserta berhasil diimpor.` };
 }
@@ -65,6 +67,7 @@ export async function addParticipantAction(
     .insert({ bracket_id: bracketId, name, club_name: club });
 
   if (error) return { error: error.message };
+  await logActivity("add_participant", `Menambah peserta "${name}" ke bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
   return { success: "Pasangan peserta ditambahkan." };
 }
@@ -74,6 +77,7 @@ export async function deleteParticipantAction(bracketId: string, participantId: 
   const supabase = getSupabaseServer();
   const { error } = await supabase.from("participants").delete().eq("id", participantId);
   if (error) throw new Error(error.message);
+  await logActivity("delete_participant", `Menghapus peserta ${participantId} dari bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
 }
 
@@ -96,6 +100,7 @@ export async function updateParticipantAction(
     .eq("id", participantId);
 
   if (error) return { error: error.message };
+  await logActivity("update_participant", `Memperbarui peserta "${name}" di bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
   return { success: "Pasangan peserta berhasil diperbarui." };
 }
@@ -147,6 +152,7 @@ export async function generateBracketAction(bracketId: string): Promise<{ error?
 
   await supabase.from("brackets").update({ status: "generated" }).eq("id", bracketId);
 
+  await logActivity("generate_bracket", `Generate bagan untuk bracket ${bracketId} (${bracket.name})`);
   revalidatePath(`/brackets/${bracketId}`);
 
   if (remainingCollisions > 0) {
@@ -319,6 +325,7 @@ export async function setWinnerAction(bracketId: string, matchId: string, partic
     }
   }
 
+  await logActivity("set_winner", `Set pemenang match ${matchId} di bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
 }
 
@@ -410,6 +417,7 @@ export async function updateBracketScheduleAction(
     if (insertBreakError) return { error: insertBreakError.message };
   }
 
+  await logActivity("update_schedule", `Update jadwal bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
   return { success: "Jadwal diperbarui. Tekan tombol acak ulang di bawah agar jam pertandingan ikut diperbarui." };
 }
@@ -429,6 +437,7 @@ export async function updateBracketNameAction(
 
   if (error) return { error: error.message };
 
+  await logActivity("update_bracket_name", `Ubah nama bracket ${bracketId} menjadi "${name}"`);
   revalidatePath(`/brackets/${bracketId}`);
   revalidatePath("/dashboard");
   return { success: "Nama turnamen berhasil diperbarui." };

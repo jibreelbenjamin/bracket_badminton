@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-log";
 import type { ActionState } from "@/lib/types";
 
 export async function updateSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -38,6 +39,7 @@ export async function updateSettingsAction(_prevState: ActionState, formData: Fo
 
   if (error) return { error: error.message };
 
+  await logActivity("update_settings", "Memperbarui pengaturan aplikasi");
   revalidatePath("/settings");
   return { success: "Pengaturan berhasil disimpan." };
 }
