@@ -19,20 +19,24 @@ import {
 export default function DeleteBracketButton({
   bracketId,
   bracketName,
+  onDeletingChange,
 }: {
   bracketId: string;
   bracketName: string;
+  onDeletingChange?: (deleting: boolean) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function handleDelete() {
+    onDeletingChange?.(true);
     startTransition(async () => {
       try {
         await deleteBracketAction(bracketId);
         toast.success(`Bracket "${bracketName}" berhasil dihapus.`);
         router.refresh();
       } catch (err) {
+        onDeletingChange?.(false);
         toast.error(err instanceof Error ? err.message : "Gagal menghapus bracket.");
       }
     });

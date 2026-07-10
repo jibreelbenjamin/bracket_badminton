@@ -10,6 +10,14 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Jakarta",
+  });
+}
+
 export default function MatchBox({
   bracketId,
   match,
@@ -59,7 +67,7 @@ export default function MatchBox({
     >
       <div className="match-time">
         {match.start_time && match.end_time
-          ? `${formatTime(match.start_time)} - ${formatTime(match.end_time)}`
+          ? `${formatDate(match.start_time)},  ${formatTime(match.start_time)} - ${formatTime(match.end_time)}`
           : ""}
       </div>
       {isPending && (

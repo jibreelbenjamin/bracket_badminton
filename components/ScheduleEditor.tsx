@@ -69,11 +69,14 @@ export default function ScheduleEditor({
       : [{ id: nextDayId() }]
   );
 
-  // Round assignment state: round_number → schedule_day_id
-  const [roundAssignMap, setRoundAssignMap] = useState<Map<number, string>>(() => {
-    const map = new Map<number, string>();
+  // Round assignment state: round_number → day_index
+  const [roundAssignMap, setRoundAssignMap] = useState<Map<number, number>>(() => {
+    const map = new Map<number, number>();
     for (const ra of roundAssignments) {
-      map.set(ra.round_number, ra.schedule_day_id);
+      const dayIdx = scheduleDays.findIndex((sd) => sd.id === ra.schedule_day_id);
+      if (dayIdx >= 0) {
+        map.set(ra.round_number, dayIdx);
+      }
     }
     return map;
   });
@@ -88,9 +91,12 @@ export default function ScheduleEditor({
           ? scheduleDays.map(() => ({ id: nextDayId() }))
           : [{ id: nextDayId() }]
       );
-      const map = new Map<number, string>();
+      const map = new Map<number, number>();
       for (const ra of roundAssignments) {
-        map.set(ra.round_number, ra.schedule_day_id);
+        const dayIdx = scheduleDays.findIndex((sd) => sd.id === ra.schedule_day_id);
+        if (dayIdx >= 0) {
+          map.set(ra.round_number, dayIdx);
+        }
       }
       setRoundAssignMap(map);
     }
@@ -132,12 +138,9 @@ export default function ScheduleEditor({
     setDays((prev) => prev.filter((d) => d.id !== id));
   }
 
-  function handleRoundAssignment(roundNumber: number, scheduleDayIndex: number) {
+  function handleRoundAssignment(roundNumber: number, dayIndex: number) {
     const newMap = new Map(roundAssignMap);
-    // Find the actual schedule_day_id from the index
-    // In edit mode, we use existing scheduleDays data; for new days, we'll use index
-    const dayId = scheduleDays[scheduleDayIndex]?.id ?? `new_day_${scheduleDayIndex}`;
-    newMap.set(roundNumber, dayId);
+    newMap.set(roundNumber, dayIndex);
     setRoundAssignMap(newMap);
   }
 
@@ -226,7 +229,7 @@ export default function ScheduleEditor({
           <input type="hidden" name="day_count" value={days.length} autoComplete="off" />
 
           {/* Round-to-Day Assignment */}
-          {rounds.length > 0 && scheduleDays.length > 0 && (
+          {rounds.length > 0 && days.length > 1 && (
             <div className="rounded-lg border border-court-100 bg-court-50/50 p-3">
               <Label className="text-xs text-ink-700 font-medium block mb-2">
                 Penugasan Babak ke Hari
@@ -237,15 +240,14 @@ export default function ScheduleEditor({
               </p>
               <div className="space-y-1.5">
                 {rounds.map((roundNum) => {
-                  const currentDayId = roundAssignMap.get(roundNum);
-                  const currentDayIndex = scheduleDays.findIndex((sd) => sd.id === currentDayId);
+                  const currentDayIndex = roundAssignMap.get(roundNum);
                   return (
                     <div key={roundNum} className="flex items-center gap-2">
                       <span className="text-xs text-ink-700 w-24 shrink-0 font-medium">
                         {roundLabel(roundNum, totalRounds)}
                       </span>
                       <Select
-                        value={currentDayIndex >= 0 ? String(currentDayIndex) : "auto"}
+                        value={currentDayIndex !== undefined ? String(currentDayIndex) : "auto"}
                         onValueChange={(val) => {
                           if (val !== "auto") {
                             handleRoundAssignment(roundNum, Number(val));
@@ -262,9 +264,9 @@ export default function ScheduleEditor({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="auto">Otomatis</SelectItem>
-                          {scheduleDays.map((sd, idx) => (
-                            <SelectItem key={sd.id} value={String(idx)}>
-                              Hari {idx + 1}: {formatDateStr(sd.date)} ({sd.start_time_str}–{sd.end_time_str})
+                          {days.map((_, idx) => (
+                            <SelectItem key={idx} value={String(idx)}>
+                              Hari {idx + 1}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -391,17 +393,12 @@ export default function ScheduleEditor({
 
           {/* Round assignment hidden fields */}
           <input type="hidden" name="round_assign_count" value={roundAssignMap.size} autoComplete="off" />
-          {Array.from(roundAssignMap.entries()).map(([roundNum, dayId], idx) => {
-            // Find day_index from scheduleDays
-            const dayIdx = scheduleDays.findIndex((sd) => sd.id === dayId);
-            if (dayIdx < 0) return null;
-            return (
-              <div key={`ra-${roundNum}`}>
-                <input type="hidden" name={`ra_round_${idx}`} value={roundNum} autoComplete="off" />
-                <input type="hidden" name={`ra_day_index_${idx}`} value={dayIdx} autoComplete="off" />
-              </div>
-            );
-          })}
+          {Array.from(roundAssignMap.entries()).map(([roundNum, dayIdx], idx) => (
+            <div key={`ra-${roundNum}`}>
+              <input type="hidden" name={`ra_round_${idx}`} value={roundNum} autoComplete="off" />
+              <input type="hidden" name={`ra_day_index_${idx}`} value={dayIdx} autoComplete="off" />
+            </div>
+          ))}
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>

@@ -11,6 +11,7 @@ import ScheduleEditor from "@/components/ScheduleEditor";
 import BracketNameEditor from "@/components/BracketNameEditor";
 import ParticipantChangeAlert from "@/components/ParticipantChangeAlert";
 import { BracketLoadingProvider } from "@/components/BracketLoadingProvider";
+import BracketLoadingOverlay from "@/components/BracketLoadingOverlay";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,7 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
   return (
     <main className="max-w-6xl mx-auto px-6 py-10">
       <BracketLoadingProvider>
+        <BracketLoadingOverlay />
         <Link href="/dashboard" className="text-sm text-ink-500 hover:text-court-700 transition-colors">
           &larr; Kembali ke daftar bracket
         </Link>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { emitNavigationStart } from "./NavigationProgress";
 import DeleteBracketButton from "./DeleteBracketButton";
@@ -8,12 +8,26 @@ import type { Bracket } from "@/lib/types";
 
 export default function BracketList({ brackets }: { brackets: Bracket[] }) {
   const [isPending, startTransition] = useTransition();
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const router = useRouter();
 
   function handleClick(id: string) {
+    if (deletingIds.has(id)) return;
     emitNavigationStart();
     startTransition(() => {
       router.push(`/brackets/${id}`);
+    });
+  }
+
+  function handleDeletingChange(id: string, deleting: boolean) {
+    setDeletingIds((prev) => {
+      const next = new Set(prev);
+      if (deleting) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
     });
   }
 
@@ -26,13 +40,17 @@ export default function BracketList({ brackets }: { brackets: Bracket[] }) {
           </p>
         </div>
       ) : (
-        brackets.map((b) => (
+        brackets.map((b) => {
+          const isDeleting = deletingIds.has(b.id);
+          return (
         <div
           key={b.id}
-          className="bg-white shadow-sm hover:shadow-md transition-shadow rounded-2xl border border-court-100 relative cursor-pointer"
+          className={`bg-white shadow-sm hover:shadow-md transition-shadow rounded-2xl border border-court-100 relative ${
+            isDeleting ? "opacity-50 pointer-events-none cursor-not-allowed" : "cursor-pointer"
+          }`}
           onClick={() => handleClick(b.id)}
           role="button"
-          tabIndex={0}
+          tabIndex={isDeleting ? -1 : 0}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") handleClick(b.id);
           }}
@@ -67,10 +85,14 @@ export default function BracketList({ brackets }: { brackets: Bracket[] }) {
           </div>
 
           <div className="absolute bottom-3 right-4" onClick={(e) => e.stopPropagation()}>
-            <DeleteBracketButton bracketId={b.id} bracketName={b.name} />
+            <DeleteBracketButton
+              bracketId={b.id}
+              bracketName={b.name}
+              onDeletingChange={(deleting) => handleDeletingChange(b.id, deleting)}
+            />
           </div>
         </div>
-        ))
+        )})
       )}
 
       {isPending && (

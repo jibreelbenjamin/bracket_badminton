@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { generateBracketAction } from "@/app/brackets/[id]/actions";
 import { Button } from "@/components/ui/button";
+import { useBracketLoading } from "@/components/BracketLoadingProvider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,18 +29,24 @@ export default function GenerateBracketButton({
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const { setBracketLoading } = useBracketLoading();
 
   function runGenerate() {
+    setBracketLoading(true);
     startTransition(async () => {
-      const result = await generateBracketAction(bracketId);
-      if (result.error) {
-        toast.error(result.error);
-      } else if (result.warning) {
-        toast.warning(result.warning);
-      } else {
-        toast.success(hasMatches ? "Bagan berhasil diacak ulang." : "Bagan berhasil dibuat.");
+      try {
+        const result = await generateBracketAction(bracketId);
+        if (result.error) {
+          toast.error(result.error);
+        } else if (result.warning) {
+          toast.warning(result.warning);
+        } else {
+          toast.success(hasMatches ? "Bagan berhasil diacak ulang." : "Bagan berhasil dibuat.");
+        }
+        router.refresh();
+      } finally {
+        setBracketLoading(false);
       }
-      router.refresh();
     });
   }
 

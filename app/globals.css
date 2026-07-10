@@ -205,6 +205,9 @@ h3,
   letter-spacing: 0.02em;
   height: 18px;
   line-height: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .player-row {

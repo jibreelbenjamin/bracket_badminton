@@ -575,6 +575,26 @@ export async function updateBracketScheduleAction(
     }
   }
 
+  // Auto-distribusi default: jika tidak ada assignment manual maupun
+  // data lama, dan ada lebih dari 1 hari, distribusikan semua babak
+  // ke hari secara otomatis — babak awal di hari awal, dst.
+  if (newRoundToDayIndex.size === 0 && scheduleDays.length > 1) {
+    const { data: existingMatchesForRounds } = await supabase
+      .from("matches")
+      .select("round_number")
+      .eq("bracket_id", bracketId)
+      .order("round_number");
+
+    if (existingMatchesForRounds && existingMatchesForRounds.length > 0) {
+      const totalRounds = Math.max(...existingMatchesForRounds.map((m) => m.round_number));
+      let dayIdx = 0;
+      for (let r = 1; r <= totalRounds; r++) {
+        newRoundToDayIndex.set(r, dayIdx % scheduleDays.length);
+        dayIdx++;
+      }
+    }
+  }
+
   // Insert round assignments dengan new day IDs
   if (insertedDays && newRoundToDayIndex.size > 0) {
     const newDayIdByIndex = new Map<number, string>();
