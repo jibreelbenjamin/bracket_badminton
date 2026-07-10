@@ -11,10 +11,16 @@ import { DatePicker } from "@/components/DatePicker";
 import { TimePicker } from "@/components/TimePicker";
 
 type BreakEntry = { id: number };
+type DayEntry = { id: number };
 
 let breakIdCounter = 0;
 function nextBreakId() {
   return ++breakIdCounter;
+}
+
+let dayIdCounter = 0;
+function nextDayId() {
+  return ++dayIdCounter;
 }
 
 export default function CreateBracketForm({
@@ -28,6 +34,7 @@ export default function CreateBracketForm({
 }) {
   const [state, formAction, pending] = useActionState(createBracketAction, undefined);
   const [breaks, setBreaks] = useState<BreakEntry[]>([]);
+  const [days, setDays] = useState<DayEntry[]>([{ id: nextDayId() }]);
 
   useEffect(() => {
     if (state?.error) toast.error(state.error);
@@ -42,6 +49,15 @@ export default function CreateBracketForm({
 
   function removeBreak(id: number) {
     setBreaks((prev) => prev.filter((b) => b.id !== id));
+  }
+
+  function addDay() {
+    setDays((prev) => [...prev, { id: nextDayId() }]);
+  }
+
+  function removeDay(id: number) {
+    if (days.length <= 1) return; // Minimal 1 hari
+    setDays((prev) => prev.filter((d) => d.id !== id));
   }
 
   return (
@@ -61,17 +77,66 @@ export default function CreateBracketForm({
         />
       </div>
 
-      <div>
-        <Label className="mb-1.5 block text-ink-700">Tanggal Mulai</Label>
-        <DatePicker name="date" defaultValue={defaultDate} disabled={pending} />
+      {/* Multi-Day Schedule */}
+      <div className="rounded-xl border border-court-100 bg-court-50/50 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <Label className="text-ink-700 font-medium">Hari Pelaksanaan</Label>
+          <Button type="button" variant="outline" size="sm" onClick={addDay} className="gap-1">
+            <Plus className="w-4 h-4" />
+            Tambah Hari
+          </Button>
+        </div>
+        <p className="text-xs text-ink-500 mb-3">
+          Tambahkan satu atau lebih hari pelaksanaan turnamen. Nanti Anda bisa memilih babak mana
+          yang dilaksanakan di setiap hari.
+        </p>
+
+        <div className="space-y-3">
+          {days.map((d, i) => (
+            <div key={d.id} className="flex items-start gap-2 p-3 bg-white rounded-lg border border-court-100">
+              <div className="flex-1 flex flex-col gap-2">
+                <div>
+                  <Label className="mb-1 block text-xs text-ink-600">
+                    Tanggal {days.length > 1 ? `(Hari ${i + 1})` : ""}
+                  </Label>
+                  <DatePicker name={`day_date_${i}`} defaultValue={defaultDate} disabled={pending} />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs text-ink-600">Jam Mulai</Label>
+                  <TimePicker
+                    name={`day_start_${i}`}
+                    defaultValue={i === 0 ? "08:00" : "08:00"}
+                    disabled={pending}
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs text-ink-600">Jam Selesai</Label>
+                  <TimePicker
+                    name={`day_end_${i}`}
+                    defaultValue="21:00"
+                    disabled={pending}
+                  />
+                </div>
+              </div>
+              {days.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-ink-400 hover:text-red-500 shrink-0 mt-5"
+                  onClick={() => removeDay(d.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div>
-        <Label className="mb-1.5 block text-ink-700">Jam Mulai (Babak 1)</Label>
-        <TimePicker name="time" defaultValue="08:00" disabled={pending} />
-      </div>
+      <input type="hidden" name="day_count" value={days.length} autoComplete="off" />
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <Label htmlFor="match_duration_minutes" className="mb-1.5 block text-ink-700">
             Durasi tiap Babak (menit)
@@ -140,8 +205,8 @@ export default function CreateBracketForm({
         <div className="space-y-3">
           {breaks.map((b, i) => (
             <div key={b.id} className="flex items-end gap-2">
-              <div className="flex-1 grid grid-cols-10 gap-2">
-                <div className="col-span-4">
+              <div className="flex-1 flex flex-col gap-2">
+                <div>
                   <Label className="mb-1 block text-xs text-ink-600">Label</Label>
                   <Input
                     name={`break_label_${i}`}
@@ -151,26 +216,20 @@ export default function CreateBracketForm({
                     className="bg-white text-xs h-9"
                   />
                 </div>
-                <div className="col-span-3">
+                <div>
                   <Label className="mb-1 block text-xs text-ink-600">Mulai</Label>
-                  <input
-                    type="time"
+                  <TimePicker
                     name={`break_start_${i}`}
                     defaultValue="12:00"
-                    autoComplete="off"
                     disabled={pending}
-                    className="flex h-9 w-full rounded-lg border border-court-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
-                <div className="col-span-3">
+                <div>
                   <Label className="mb-1 block text-xs text-ink-600">Selesai</Label>
-                  <input
-                    type="time"
+                  <TimePicker
                     name={`break_end_${i}`}
                     defaultValue="13:00"
-                    autoComplete="off"
                     disabled={pending}
-                    className="flex h-9 w-full rounded-lg border border-court-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-court-400 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -191,8 +250,8 @@ export default function CreateBracketForm({
       <input type="hidden" name="break_count" value={breaks.length} autoComplete="off" />
 
       <p className="rounded-xl border border-court-100 bg-court-50 px-4 py-3 text-xs text-ink-500">
-        Jam setiap babak berikutnya akan dihitung otomatis berdasarkan jumlah lapangan: pertandingan
-        dibagi menjadi beberapa gelombang jika jumlah pertandingan melebihi lapangan tersedia.
+        Jam setiap babak akan dihitung otomatis berdasarkan jumlah lapangan dan hari pelaksanaan.
+        Pertandingan dibagi menjadi beberapa gelombang jika jumlah pertandingan melebihi lapangan tersedia.
         Waktu istirahat khusus di atas juga akan dihindari dalam penjadwalan.
       </p>
 

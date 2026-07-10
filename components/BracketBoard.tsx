@@ -5,7 +5,7 @@ import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { Loader2, Maximize2, Minimize2, Trophy } from "lucide-react";
 import { roundLabel } from "@/lib/bracket-logic";
-import type { Bracket, MatchRow, Participant } from "@/lib/types";
+import type { Bracket, MatchRow, Participant, ScheduleDay, RoundAssignment } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import MatchBox from "./MatchBox";
 import ShareBracketButton from "./ShareBracketButton";
@@ -21,11 +21,15 @@ export default function BracketBoard({
   bracket,
   matches,
   participants,
+  scheduleDays = [],
+  roundAssignments = [],
   readonly = false,
 }: {
   bracket: Bracket;
   matches: MatchRow[];
   participants: Participant[];
+  scheduleDays?: ScheduleDay[];
+  roundAssignments?: RoundAssignment[];
   readonly?: boolean;
 }) {
   const exportRef = useRef<HTMLDivElement>(null);
@@ -34,6 +38,50 @@ export default function BracketBoard({
   const [exporting, setExporting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { isBracketLoading } = useBracketLoading();
+
+  // Build round → day lookup: dari explicit assignments + auto-detect dari match time
+  const roundDayMap = useMemo(() => {
+    const map = new Map<number, ScheduleDay>();
+    const dayById = new Map(scheduleDays.map((sd) => [sd.id, sd]));
+
+    // 1. Explicit round assignments
+    for (const ra of roundAssignments) {
+      const day = dayById.get(ra.schedule_day_id);
+      if (day) {
+        map.set(ra.round_number, day);
+      }
+    }
+
+    // 2. Fallback: deteksi hari dari match.start_time (untuk babak auto-distribute)
+    // Cari tanggal dari pertandingan pertama setiap babak
+    if (scheduleDays.length > 0) {
+      const dayByDate = new Map<string, ScheduleDay>();
+      for (const sd of scheduleDays) {
+        dayByDate.set(sd.date, sd);
+      }
+
+      // Group matches by round, ambil start_time match pertama
+      const roundsWithoutDay = new Set<number>();
+      for (const m of matches) {
+        if (!map.has(m.round_number)) {
+          roundsWithoutDay.add(m.round_number);
+        }
+      }
+
+      for (const roundNum of roundsWithoutDay) {
+        const firstMatch = matches.find((m) => m.round_number === roundNum && m.start_time);
+        if (firstMatch?.start_time) {
+          const matchDate = firstMatch.start_time.slice(0, 10); // YYYY-MM-DD
+          const day = dayByDate.get(matchDate);
+          if (day) {
+            map.set(roundNum, day);
+          }
+        }
+      }
+    }
+
+    return map;
+  }, [scheduleDays, roundAssignments, matches]);
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -174,9 +222,20 @@ export default function BracketBoard({
               >
                 <div className="round-header">
                   <div className="round-title">{roundLabel(roundNum, totalRounds)}</div>
+                  <div className="round-match-count">{roundMatches.length} pertandingan</div>
                   {first?.start_time && last?.end_time && (
                     <div className="round-time">
                       {formatTime(first.start_time)} - {formatTime(last.end_time)}
+                    </div>
+                  )}
+                  {roundDayMap.has(roundNum) && (
+                    <div className="round-day text-[10px] text-court-600 mt-0.5">
+                      {new Date(roundDayMap.get(roundNum)!.date + "T00:00:00").toLocaleDateString("id-ID", {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                        timeZone: "Asia/Jakarta",
+                      })}
                     </div>
                   )}
                 </div>

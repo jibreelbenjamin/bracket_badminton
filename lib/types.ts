@@ -58,4 +58,29 @@ export type BreakTimeInsert = {
   end_time_str: string;
 };
 
+export type ScheduleDay = {
+  id: string;
+  bracket_id: string;
+  date: string; // YYYY-MM-DD
+  start_time_str: string; // HH:mm
+  end_time_str: string;   // HH:mm
+  day_index: number;
+  created_at: string;
+};
+
+export type ScheduleDayInsert = {
+  date: string;
+  start_time_str: string;
+  end_time_str: string;
+  day_index: number;
+};
+
+export type RoundAssignment = {
+  id: string;
+  bracket_id: string;
+  round_number: number;
+  schedule_day_id: string;
+  created_at: string;
+};
+
 export type ActionState = { error?: string; success?: string } | undefined;

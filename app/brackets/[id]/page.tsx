@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import type { Bracket, BreakTime, MatchRow, Participant } from "@/lib/types";
+import type { Bracket, BreakTime, MatchRow, Participant, ScheduleDay, RoundAssignment } from "@/lib/types";
 import ImportParticipantsForm from "@/components/ImportParticipantsForm";
 import ParticipantsTable from "@/components/ParticipantsTable";
 import GenerateBracketButton from "@/components/GenerateBracketButton";
@@ -55,7 +55,7 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
 
   if (!bracket) notFound();
 
-  const [{ data: participants }, { data: matches }, { data: breakTimes }] = await Promise.all([
+  const [{ data: participants }, { data: matches }, { data: breakTimes }, { data: scheduleDays }, { data: roundAssignments }] = await Promise.all([
     supabase.from("participants").select("*").eq("bracket_id", id).order("name").returns<Participant[]>(),
     supabase
       .from("matches")
@@ -70,11 +70,24 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
       .eq("bracket_id", id)
       .order("created_at")
       .returns<BreakTime[]>(),
+    supabase
+      .from("schedule_days")
+      .select("*")
+      .eq("bracket_id", id)
+      .order("day_index")
+      .returns<ScheduleDay[]>(),
+    supabase
+      .from("round_schedule_assignments")
+      .select("*")
+      .eq("bracket_id", id)
+      .returns<RoundAssignment[]>(),
   ]);
 
   const participantList = participants ?? [];
   const matchList = matches ?? [];
   const breakTimeList = breakTimes ?? [];
+  const scheduleDayList = scheduleDays ?? [];
+  const roundAssignmentList = roundAssignments ?? [];
 
   const participantChanges = detectParticipantChanges(participantList, matchList);
 
@@ -92,15 +105,40 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
               <BracketNameEditor bracketId={bracket.id} currentName={bracket.name} />
             </div>
             <p className="text-sm text-ink-500 mt-1">
-              Mulai{" "}
-              {new Date(bracket.start_time).toLocaleString("id-ID", {
-                dateStyle: "full",
-                timeStyle: "short",
-                timeZone: "Asia/Jakarta",
-              })}{" "}
-              &middot; {bracket.match_duration_minutes} menit/babak &middot; istirahat{" "}
+              {scheduleDayList.length > 1 ? (
+                <>
+                  {scheduleDayList.length} hari pelaksanaan &middot;{" "}
+                </>
+              ) : (
+                <>
+                  Mulai{" "}
+                  {new Date(bracket.start_time).toLocaleString("id-ID", {
+                    dateStyle: "full",
+                    timeStyle: "short",
+                    timeZone: "Asia/Jakarta",
+                  })}{" "}
+                </>
+              )}
+              {bracket.match_duration_minutes} menit/babak &middot; istirahat{" "}
               {bracket.rest_duration_minutes} menit &middot; {bracket.courts_count ?? 1} lapangan
             </p>
+            {/* Schedule days summary */}
+            {scheduleDayList.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {scheduleDayList.map((sd, i) => (
+                  <span
+                    key={sd.id}
+                    className="inline-flex items-center gap-1 rounded-full bg-court-50 border border-court-200 px-2 py-0.5 text-xs text-court-700"
+                  >
+                    Hari {i + 1}: {new Date(sd.date + "T00:00:00").toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "short",
+                      timeZone: "Asia/Jakarta",
+                    })} ({sd.start_time_str}–{sd.end_time_str})
+                  </span>
+                ))}
+              </div>
+            )}
             {breakTimeList.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {breakTimeList.map((bt) => (
@@ -115,7 +153,13 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
             <div className="mt-1">
-              <ScheduleEditor bracket={bracket} breakTimes={breakTimeList} />
+              <ScheduleEditor
+                bracket={bracket}
+                breakTimes={breakTimeList}
+                scheduleDays={scheduleDayList}
+                roundAssignments={roundAssignmentList}
+                matches={matchList}
+              />
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -143,7 +187,13 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
         </section>
 
         {matchList.length > 0 ? (
-          <BracketBoard bracket={bracket} matches={matchList} participants={participantList} />
+          <BracketBoard
+            bracket={bracket}
+            matches={matchList}
+            participants={participantList}
+            scheduleDays={scheduleDayList}
+            roundAssignments={roundAssignmentList}
+          />
         ) : (
           <div className="text-center py-16 border-2 border-dashed border-court-200 rounded-2xl">
             <p className="text-ink-500 text-sm">

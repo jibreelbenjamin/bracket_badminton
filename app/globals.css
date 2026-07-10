@@ -98,6 +98,16 @@ h3,
   flex: none;
 }
 
+/* Garis putus-putus pemisah antar babak */
+.bracket-round:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 0;
+  bottom: 0;
+  border-left: 1.5px dashed var(--color-court-200);
+}
+
 .round-header {
   text-align: center;
   margin-bottom: 20px;
@@ -111,6 +121,18 @@ h3,
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-court-800);
+}
+
+.round-match-count {
+  font-size: 10px;
+  color: var(--color-ink-400);
+  margin-top: 2px;
+}
+
+.round-day {
+  font-size: 10px;
+  color: var(--color-court-600);
+  margin-top: 2px;
 }
 
 .round-time {

@@ -91,6 +91,37 @@ create table if not exists break_times (
 create index if not exists break_times_bracket_id_idx on break_times(bracket_id);
 
 -- ---------------------------------------------------------
+-- schedule_days: hari pelaksanaan turnamen (bisa 1 atau lebih)
+-- Setiap hari punya tanggal, jam mulai, dan jam selesai.
+-- ---------------------------------------------------------
+create table if not exists schedule_days (
+  id uuid primary key default gen_random_uuid(),
+  bracket_id uuid not null references brackets(id) on delete cascade,
+  date date not null,
+  start_time_str text not null, -- format HH:mm
+  end_time_str text not null,   -- format HH:mm
+  day_index int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists schedule_days_bracket_id_idx on schedule_days(bracket_id);
+
+-- ---------------------------------------------------------
+-- round_schedule_assignments: menetapkan babak ke hari tertentu
+-- Setiap babak (round_number) ditugaskan ke satu schedule_day.
+-- ---------------------------------------------------------
+create table if not exists round_schedule_assignments (
+  id uuid primary key default gen_random_uuid(),
+  bracket_id uuid not null references brackets(id) on delete cascade,
+  round_number int not null,
+  schedule_day_id uuid references schedule_days(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (bracket_id, round_number)
+);
+
+create index if not exists round_schedule_assignments_bracket_id_idx on round_schedule_assignments(bracket_id);
+
+-- ---------------------------------------------------------
 -- activity_logs: log aktivitas pengguna (hanya server-side, tidak
 -- ditampilkan di client). Menyimpan IP, negara, browser, dan aksi.
 -- ---------------------------------------------------------
@@ -119,6 +150,8 @@ alter table brackets enable row level security;
 alter table participants enable row level security;
 alter table matches enable row level security;
 alter table break_times enable row level security;
+alter table schedule_days enable row level security;
+alter table round_schedule_assignments enable row level security;
 alter table activity_logs enable row level security;
 
 -- ---------------------------------------------------------

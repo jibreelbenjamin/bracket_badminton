@@ -15,15 +15,13 @@ export async function createBracketAction(_prevState: ActionState, formData: For
   await requireAuth();
 
   const name = String(formData.get("name") ?? "").trim();
-  const date = String(formData.get("date") ?? "");
-  const time = String(formData.get("time") ?? "");
   const matchDuration = Number(formData.get("match_duration_minutes"));
   const restDuration = Number(formData.get("rest_duration_minutes"));
   const courtsCount = Number(formData.get("courts_count") ?? 1);
   const breakCount = Number(formData.get("break_count") ?? 0);
+  const dayCount = Number(formData.get("day_count") ?? 1);
 
   if (!name) return { error: "Nama bracket wajib diisi." };
-  if (!date || !time) return { error: "Tanggal dan jam mulai wajib diisi." };
   if (!Number.isFinite(matchDuration) || matchDuration <= 0) {
     return { error: "Durasi tiap babak harus berupa angka lebih dari 0." };
   }
@@ -32,6 +30,30 @@ export async function createBracketAction(_prevState: ActionState, formData: For
   }
   if (!Number.isFinite(courtsCount) || courtsCount < 1) {
     return { error: "Jumlah lapangan minimal 1." };
+  }
+  if (!Number.isFinite(dayCount) || dayCount < 1) {
+    return { error: "Minimal 1 hari pelaksanaan." };
+  }
+
+  // Parse schedule days dari form
+  const scheduleDays: { date: string; start_time_str: string; end_time_str: string; day_index: number }[] = [];
+  for (let i = 0; i < dayCount; i++) {
+    const dayDate = String(formData.get(`day_date_${i}`) ?? "").trim();
+    const dayStart = String(formData.get(`day_start_${i}`) ?? "").trim();
+    const dayEnd = String(formData.get(`day_end_${i}`) ?? "").trim();
+
+    if (!dayDate) return { error: `Hari ke-${i + 1}: tanggal wajib diisi.` };
+    if (!dayStart || !dayEnd) {
+      return { error: `Hari ke-${i + 1}: jam mulai dan selesai wajib diisi.` };
+    }
+    if (!isValidTimeStr(dayStart) || !isValidTimeStr(dayEnd)) {
+      return { error: `Hari ke-${i + 1}: format jam tidak valid (HH:mm).` };
+    }
+    if (dayStart >= dayEnd) {
+      return { error: `Hari ke-${i + 1}: jam mulai harus sebelum jam selesai.` };
+    }
+
+    scheduleDays.push({ date: dayDate, start_time_str: dayStart, end_time_str: dayEnd, day_index: i });
   }
 
   // Parse break times dari form
@@ -56,7 +78,9 @@ export async function createBracketAction(_prevState: ActionState, formData: For
     }
   }
 
-  const startTime = new Date(`${date}T${time}:00+07:00`);
+  // Gunakan hari pertama sebagai start_time utama bracket (untuk backward compatibility)
+  const firstDay = scheduleDays[0];
+  const startTime = new Date(`${firstDay.date}T${firstDay.start_time_str}:00+07:00`);
   if (Number.isNaN(startTime.getTime())) {
     return { error: "Format tanggal/jam mulai tidak valid." };
   }
@@ -76,6 +100,21 @@ export async function createBracketAction(_prevState: ActionState, formData: For
 
   if (error || !data) {
     return { error: error?.message ?? "Gagal membuat bracket." };
+  }
+
+  // Insert schedule days
+  const { error: dayError } = await supabase.from("schedule_days").insert(
+    scheduleDays.map((d) => ({
+      bracket_id: data.id,
+      date: d.date,
+      start_time_str: d.start_time_str,
+      end_time_str: d.end_time_str,
+      day_index: d.day_index,
+    }))
+  );
+  if (dayError) {
+    await supabase.from("brackets").delete().eq("id", data.id);
+    return { error: `Gagal menyimpan hari pelaksanaan: ${dayError.message}` };
   }
 
   // Insert break times jika ada

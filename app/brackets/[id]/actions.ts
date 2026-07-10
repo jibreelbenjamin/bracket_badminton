@@ -154,7 +154,7 @@ export async function generateBracketAction(bracketId: string): Promise<{ error?
 
   if (bracketError || !bracket) return { error: "Bracket tidak ditemukan." };
 
-  const [{ data: participants, error: participantsError }, { data: breakTimes }] = await Promise.all([
+  const [{ data: participants, error: participantsError }, { data: breakTimes }, { data: scheduleDays }, { data: roundAssignments }] = await Promise.all([
     supabase
       .from("participants")
       .select("*")
@@ -165,6 +165,17 @@ export async function generateBracketAction(bracketId: string): Promise<{ error?
       .select("start_time_str, end_time_str")
       .eq("bracket_id", bracketId)
       .returns<{ start_time_str: string; end_time_str: string }[]>(),
+    supabase
+      .from("schedule_days")
+      .select("id, date, start_time_str, end_time_str, day_index")
+      .eq("bracket_id", bracketId)
+      .order("day_index")
+      .returns<{ id: string; date: string; start_time_str: string; end_time_str: string; day_index: number }[]>(),
+    supabase
+      .from("round_schedule_assignments")
+      .select("round_number, schedule_day_id")
+      .eq("bracket_id", bracketId)
+      .returns<{ round_number: number; schedule_day_id: string }[]>(),
   ]);
 
   if (participantsError) return { error: participantsError.message };
@@ -175,7 +186,9 @@ export async function generateBracketAction(bracketId: string): Promise<{ error?
   const { matches, remainingCollisions } = generateMatchesForBracket(
     bracket,
     participants,
-    breakTimes ?? []
+    breakTimes ?? [],
+    scheduleDays ?? [],
+    roundAssignments ?? []
   );
 
   const { error: deleteError } = await supabase.from("matches").delete().eq("bracket_id", bracketId);
@@ -186,6 +199,38 @@ export async function generateBracketAction(bracketId: string): Promise<{ error?
 
   // Auto-resolve match yang hanya punya 1 peserta real (dari BYE vs BYE dsb)
   await autoResolveAllMatches(supabase, bracketId);
+
+  // Simpan auto-assigned round assignments ke database (jika belum ada)
+  if ((scheduleDays ?? []).length > 0) {
+    const existingRounds = new Set((roundAssignments ?? []).map((ra) => ra.round_number));
+    const dayByDate = new Map<string, string>(); // date → schedule_day_id
+    for (const sd of (scheduleDays ?? [])) {
+      dayByDate.set(sd.date, sd.id);
+    }
+
+    const newAssignments: { bracket_id: string; round_number: number; schedule_day_id: string }[] = [];
+    const seenRounds = new Set<number>();
+
+    for (const m of matches) {
+      if (seenRounds.has(m.round_number)) continue;
+      if (existingRounds.has(m.round_number)) continue;
+      seenRounds.add(m.round_number);
+
+      const matchDate = (m.start_time as string)?.slice(0, 10);
+      const dayId = matchDate ? dayByDate.get(matchDate) : undefined;
+      if (dayId) {
+        newAssignments.push({
+          bracket_id: bracketId,
+          round_number: m.round_number,
+          schedule_day_id: dayId,
+        });
+      }
+    }
+
+    if (newAssignments.length > 0) {
+      await supabase.from("round_schedule_assignments").insert(newAssignments);
+    }
+  }
 
   await supabase.from("brackets").update({ status: "generated" }).eq("id", bracketId);
 
@@ -378,14 +423,12 @@ export async function updateBracketScheduleAction(
 ): Promise<ActionState> {
   await requireAuth();
 
-  const date = String(formData.get("date") ?? "");
-  const time = String(formData.get("time") ?? "");
   const matchDuration = Number(formData.get("match_duration_minutes"));
   const restDuration = Number(formData.get("rest_duration_minutes"));
   const courtsCount = Number(formData.get("courts_count") ?? 1);
   const breakCount = Number(formData.get("break_count") ?? 0);
+  const dayCount = Number(formData.get("day_count") ?? 1);
 
-  if (!date || !time) return { error: "Tanggal dan jam mulai wajib diisi." };
   if (!Number.isFinite(matchDuration) || matchDuration <= 0) {
     return { error: "Durasi tiap babak harus berupa angka lebih dari 0." };
   }
@@ -394,6 +437,30 @@ export async function updateBracketScheduleAction(
   }
   if (!Number.isFinite(courtsCount) || courtsCount < 1) {
     return { error: "Jumlah lapangan minimal 1." };
+  }
+  if (!Number.isFinite(dayCount) || dayCount < 1) {
+    return { error: "Minimal 1 hari pelaksanaan." };
+  }
+
+  // Parse schedule days dari form
+  const scheduleDays: { date: string; start_time_str: string; end_time_str: string; day_index: number }[] = [];
+  for (let i = 0; i < dayCount; i++) {
+    const dayDate = String(formData.get(`day_date_${i}`) ?? "").trim();
+    const dayStart = String(formData.get(`day_start_${i}`) ?? "").trim();
+    const dayEnd = String(formData.get(`day_end_${i}`) ?? "").trim();
+
+    if (!dayDate) return { error: `Hari ke-${i + 1}: tanggal wajib diisi.` };
+    if (!dayStart || !dayEnd) {
+      return { error: `Hari ke-${i + 1}: jam mulai dan selesai wajib diisi.` };
+    }
+    if (!isValidTimeStr(dayStart) || !isValidTimeStr(dayEnd)) {
+      return { error: `Hari ke-${i + 1}: format jam tidak valid (HH:mm).` };
+    }
+    if (dayStart >= dayEnd) {
+      return { error: `Hari ke-${i + 1}: jam mulai harus sebelum jam selesai.` };
+    }
+
+    scheduleDays.push({ date: dayDate, start_time_str: dayStart, end_time_str: dayEnd, day_index: i });
   }
 
   // Parse break times
@@ -418,10 +485,14 @@ export async function updateBracketScheduleAction(
     }
   }
 
-  const startTime = new Date(`${date}T${time}:00+07:00`);
+  // Gunakan hari pertama sebagai start_time utama bracket
+  const firstDay = scheduleDays[0];
+  const startTime = new Date(`${firstDay.date}T${firstDay.start_time_str}:00+07:00`);
   if (Number.isNaN(startTime.getTime())) return { error: "Format tanggal/jam tidak valid." };
 
   const supabase = getSupabaseServer();
+
+  // Update bracket settings
   const { error } = await supabase
     .from("brackets")
     .update({
@@ -434,7 +505,101 @@ export async function updateBracketScheduleAction(
 
   if (error) return { error: error.message };
 
-  // Replace break times: hapus semua yang lama, insert yang baru
+  // Replace schedule days — baca data lama dulu SEBELUM delete
+  const { data: oldDays } = await supabase
+    .from("schedule_days")
+    .select("id, day_index")
+    .eq("bracket_id", bracketId)
+    .order("day_index");
+
+  // Baca round assignments lama sebelum dihapus cascade
+  const { data: oldAssignments } = await supabase
+    .from("round_schedule_assignments")
+    .select("round_number, schedule_day_id")
+    .eq("bracket_id", bracketId);
+
+  // Mapping: round_number → day_index (lama)
+  const oldRoundToDayIndex = new Map<number, number>();
+  if (oldAssignments && oldDays) {
+    const oldDayIndexById = new Map(oldDays.map((d) => [d.id, d.day_index]));
+    for (const ra of oldAssignments) {
+      const dayIdx = oldDayIndexById.get(ra.schedule_day_id);
+      if (dayIdx !== undefined) {
+        oldRoundToDayIndex.set(ra.round_number, dayIdx);
+      }
+    }
+  }
+
+  // Hapus hari lama (cascade akan menghapus round_assignments terkait)
+  await supabase.from("schedule_days").delete().eq("bracket_id", bracketId);
+
+  // Insert hari baru
+  const { data: insertedDays, error: dayInsertError } = await supabase
+    .from("schedule_days")
+    .insert(
+      scheduleDays.map((d) => ({
+        bracket_id: bracketId,
+        date: d.date,
+        start_time_str: d.start_time_str,
+        end_time_str: d.end_time_str,
+        day_index: d.day_index,
+      }))
+    )
+    .select("id, day_index");
+
+  if (dayInsertError) return { error: `Gagal menyimpan hari: ${dayInsertError.message}` };
+
+  // Re-insert round assignments: gabungkan data lama (preserved by day_index)
+  // dengan data baru dari form (round_assign_count, ra_round_N, ra_day_index_N)
+  const roundAssignCount = Number(formData.get("round_assign_count") ?? 0);
+  const newRoundToDayIndex = new Map<number, number>();
+
+  // Data dari form (jika user mengubah assignment di ScheduleEditor)
+  if (Number.isFinite(roundAssignCount) && roundAssignCount > 0) {
+    for (let i = 0; i < roundAssignCount; i++) {
+      const roundNum = Number(formData.get(`ra_round_${i}`));
+      const dayIdx = Number(formData.get(`ra_day_index_${i}`));
+      if (Number.isFinite(roundNum) && Number.isFinite(dayIdx) && dayIdx >= 0 && dayIdx < scheduleDays.length) {
+        newRoundToDayIndex.set(roundNum, dayIdx);
+      }
+    }
+  }
+
+  // Fallback: jika tidak ada data form, gunakan data lama yang di-preserve
+  if (newRoundToDayIndex.size === 0 && oldRoundToDayIndex.size > 0) {
+    for (const [roundNum, dayIdx] of oldRoundToDayIndex) {
+      // Hanya preserve jika day_index masih valid (dalam rentang scheduleDays baru)
+      if (dayIdx < scheduleDays.length) {
+        newRoundToDayIndex.set(roundNum, dayIdx);
+      }
+    }
+  }
+
+  // Insert round assignments dengan new day IDs
+  if (insertedDays && newRoundToDayIndex.size > 0) {
+    const newDayIdByIndex = new Map<number, string>();
+    for (const d of insertedDays) {
+      newDayIdByIndex.set(d.day_index, d.id);
+    }
+
+    const assignmentsToInsert: { bracket_id: string; round_number: number; schedule_day_id: string }[] = [];
+    for (const [roundNum, dayIdx] of newRoundToDayIndex) {
+      const newDayId = newDayIdByIndex.get(dayIdx);
+      if (newDayId) {
+        assignmentsToInsert.push({
+          bracket_id: bracketId,
+          round_number: roundNum,
+          schedule_day_id: newDayId,
+        });
+      }
+    }
+
+    if (assignmentsToInsert.length > 0) {
+      await supabase.from("round_schedule_assignments").insert(assignmentsToInsert);
+    }
+  }
+
+  // Replace break times
   const { error: deleteBreakError } = await supabase
     .from("break_times")
     .delete()
@@ -465,6 +630,18 @@ export async function updateBracketScheduleAction(
     .order("match_index");
 
   if (existingMatches && existingMatches.length > 0) {
+    // Ambil schedule days & round assignments terkini
+    const { data: currentDays } = await supabase
+      .from("schedule_days")
+      .select("id, date, start_time_str, end_time_str, day_index")
+      .eq("bracket_id", bracketId)
+      .order("day_index");
+
+    const { data: currentAssignments } = await supabase
+      .from("round_schedule_assignments")
+      .select("round_number, schedule_day_id")
+      .eq("bracket_id", bracketId);
+
     const updatedTimes = recomputeMatchTimes(
       {
         start_time: startTime.toISOString(),
@@ -473,14 +650,48 @@ export async function updateBracketScheduleAction(
         courts_count: courtsCount,
       },
       existingMatches,
-      breakTimes
+      breakTimes,
+      currentDays ?? [],
+      currentAssignments ?? []
     );
 
-    // Batch update all match times
     const updatePromises = Array.from(updatedTimes.entries()).map(([matchId, times]) =>
       supabase.from("matches").update({ start_time: times.start_time, end_time: times.end_time }).eq("id", matchId)
     );
     await Promise.all(updatePromises);
+
+    // Auto-save round assignments yang belum di-assign (dari auto-distribute)
+    if ((currentDays ?? []).length > 0) {
+      const assignedRounds = new Set((currentAssignments ?? []).map((ra) => ra.round_number));
+      const dayByDate = new Map<string, string>();
+      for (const sd of (currentDays ?? [])) {
+        dayByDate.set(sd.date, sd.id);
+      }
+
+      const newAssignments: { bracket_id: string; round_number: number; schedule_day_id: string }[] = [];
+      const seenRounds = new Set<number>();
+
+      for (const m of existingMatches) {
+        if (seenRounds.has(m.round_number)) continue;
+        if (assignedRounds.has(m.round_number)) continue;
+        seenRounds.add(m.round_number);
+
+        const times = updatedTimes.get(m.id);
+        const matchDate = times?.start_time?.slice(0, 10);
+        const dayId = matchDate ? dayByDate.get(matchDate) : undefined;
+        if (dayId) {
+          newAssignments.push({
+            bracket_id: bracketId,
+            round_number: m.round_number,
+            schedule_day_id: dayId,
+          });
+        }
+      }
+
+      if (newAssignments.length > 0) {
+        await supabase.from("round_schedule_assignments").insert(newAssignments);
+      }
+    }
   }
 
   revalidatePath(`/brackets/${bracketId}`);
@@ -533,4 +744,84 @@ export async function deleteAllParticipantsAction(bracketId: string) {
 
   await logActivity("delete_all_participants", `Menghapus semua peserta dari bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
+}
+
+/**
+ * Menyimpan assignment babak ke hari pelaksanaan.
+ * Menerima JSON body: { assignments: { round_number: number; schedule_day_id: string }[] }
+ */
+export async function updateRoundAssignmentsAction(
+  bracketId: string,
+  assignments: { round_number: number; schedule_day_id: string }[]
+): Promise<{ error?: string; success?: string }> {
+  await requireAuth();
+  const supabase = getSupabaseServer();
+
+  // Hapus semua assignment lama untuk bracket ini
+  await supabase
+    .from("round_schedule_assignments")
+    .delete()
+    .eq("bracket_id", bracketId);
+
+  if (assignments.length > 0) {
+    const { error } = await supabase.from("round_schedule_assignments").insert(
+      assignments.map((a) => ({
+        bracket_id: bracketId,
+        round_number: a.round_number,
+        schedule_day_id: a.schedule_day_id,
+      }))
+    );
+    if (error) return { error: error.message };
+  }
+
+  // Recompute match times dengan assignments baru
+  const { data: bracket } = await supabase
+    .from("brackets")
+    .select("*")
+    .eq("id", bracketId)
+    .single<Bracket>();
+
+  if (!bracket) return { error: "Bracket tidak ditemukan." };
+
+  const { data: existingMatches } = await supabase
+    .from("matches")
+    .select("id, round_number, match_index")
+    .eq("bracket_id", bracketId)
+    .order("round_number")
+    .order("match_index");
+
+  if (existingMatches && existingMatches.length > 0) {
+    const { data: breakTimes } = await supabase
+      .from("break_times")
+      .select("start_time_str, end_time_str")
+      .eq("bracket_id", bracketId);
+
+    const { data: scheduleDays } = await supabase
+      .from("schedule_days")
+      .select("id, date, start_time_str, end_time_str, day_index")
+      .eq("bracket_id", bracketId)
+      .order("day_index");
+
+    const updatedTimes = recomputeMatchTimes(
+      {
+        start_time: bracket.start_time,
+        match_duration_minutes: bracket.match_duration_minutes,
+        rest_duration_minutes: bracket.rest_duration_minutes,
+        courts_count: bracket.courts_count,
+      },
+      existingMatches,
+      breakTimes ?? [],
+      scheduleDays ?? [],
+      assignments
+    );
+
+    const updatePromises = Array.from(updatedTimes.entries()).map(([matchId, times]) =>
+      supabase.from("matches").update({ start_time: times.start_time, end_time: times.end_time }).eq("id", matchId)
+    );
+    await Promise.all(updatePromises);
+  }
+
+  await logActivity("update_round_assignments", `Update assignment babak untuk bracket ${bracketId}`);
+  revalidatePath(`/brackets/${bracketId}`);
+  return { success: "Penugasan babak ke hari berhasil disimpan." };
 }

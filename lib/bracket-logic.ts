@@ -1,4 +1,4 @@
-import type { Bracket, BreakTime, MatchInsert, Participant } from "@/lib/types";
+import type { Bracket, BreakTime, MatchInsert, Participant, ScheduleDay, RoundAssignment } from "@/lib/types";
 
 /** Bilangan pangkat 2 terkecil yang >= n (minimal 2). */
 export function nextPowerOfTwo(n: number): number {
@@ -232,21 +232,158 @@ export function computeRoundSchedule(
 }
 
 /**
+ * Menghitung jadwal babak dengan dukungan multi-hari (schedule_days).
+ *
+ * Jika `scheduleDays` dan `roundAssignments` disediakan, setiap babak
+ * dijadwalkan pada hari yang ditentukan. Babak yang tidak memiliki
+ * assignment akan didistribusikan otomatis ke hari yang masih ada slot.
+ *
+ * Jika `scheduleDays` kosong, fallback ke `computeRoundSchedule` (single day).
+ */
+export function computeRoundScheduleMultiDay(
+  bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes" | "courts_count">,
+  totalRounds: number,
+  bracketSize: number,
+  scheduleDays: Pick<ScheduleDay, "id" | "date" | "start_time_str" | "end_time_str" | "day_index">[],
+  roundAssignments: Pick<RoundAssignment, "round_number" | "schedule_day_id">[],
+  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = []
+): RoundSchedule[] {
+  // Fallback ke single-day jika tidak ada schedule_days
+  if (!scheduleDays || scheduleDays.length === 0) {
+    return computeRoundSchedule(bracket, totalRounds, bracketSize, breakTimes);
+  }
+
+  const breaks = breakTimes.map((b) => ({
+    startMin: timeStrToMinutes(b.start_time_str),
+    endMin: timeStrToMinutes(b.end_time_str),
+  }));
+
+  // Buat map: round_number → schedule_day_id
+  const roundToDay = new Map<number, string>();
+  for (const ra of roundAssignments) {
+    roundToDay.set(ra.round_number, ra.schedule_day_id);
+  }
+
+  // Buat map: schedule_day_id → day info
+  const dayMap = new Map(scheduleDays.map((d) => [d.id, d]));
+
+  // Urutkan hari berdasarkan day_index
+  const sortedDays = [...scheduleDays].sort((a, b) => a.day_index - b.day_index);
+
+  // Buat map: schedule_day_id → daftar round_number yang ditugaskan
+  const dayRounds = new Map<string, number[]>();
+  for (const d of sortedDays) {
+    dayRounds.set(d.id, []);
+  }
+
+  // Distribusi babak: yang sudah di-assign ke hari tertentu, sisanya auto-distribute
+  const assignedRounds = new Set<number>();
+  for (let r = 1; r <= totalRounds; r++) {
+    const dayId = roundToDay.get(r);
+    if (dayId && dayRounds.has(dayId)) {
+      dayRounds.get(dayId)!.push(r);
+      assignedRounds.add(r);
+    }
+  }
+
+  // Auto-distribute babak yang belum di-assign ke hari secara sekuensial
+  // (babak awal di hari awal, dst.)
+  let autoDayIdx = 0;
+  for (let r = 1; r <= totalRounds; r++) {
+    if (assignedRounds.has(r)) continue;
+    // Cari hari yang masih belum penuh (simple: rotasi)
+    const day = sortedDays[autoDayIdx % sortedDays.length];
+    dayRounds.get(day.id)!.push(r);
+    autoDayIdx++;
+  }
+
+  // Urutkan babak dalam setiap hari berdasarkan round_number
+  for (const rounds of dayRounds.values()) {
+    rounds.sort((a, b) => a - b);
+  }
+
+  const schedule: RoundSchedule[] = [];
+  const courts = Math.max(1, bracket.courts_count);
+  const matchDuration = bracket.match_duration_minutes;
+  const restDuration = bracket.rest_duration_minutes;
+
+  for (const day of sortedDays) {
+    const rounds = dayRounds.get(day.id) ?? [];
+    if (rounds.length === 0) continue;
+
+    // Waktu mulai hari ini: date + start_time_str
+    const [startH, startM] = day.start_time_str.split(":").map(Number);
+    const [endH, endM] = day.end_time_str.split(":").map(Number);
+    const dayEndMin = endH * 60 + endM;
+
+    let cursor = new Date(`${day.date}T${day.start_time_str}:00+07:00`);
+
+    for (const roundNum of rounds) {
+      // Lewati break time jika cursor jatuh di dalamnya
+      cursor = skipBreakIfInside(cursor, breaks);
+
+      const matchesInRound = Math.floor(bracketSize / Math.pow(2, roundNum));
+      const waves = Math.ceil(matchesInRound / courts);
+      const roundDuration = waves * matchDuration + Math.max(0, waves - 1) * restDuration;
+
+      // Pastikan babak tidak tumpang tindih dengan break time
+      let adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
+      while (adjusted.getTime() !== cursor.getTime()) {
+        cursor = adjusted;
+        adjusted = avoidBreakOverlap(cursor, roundDuration, breaks);
+      }
+
+      // Cek apakah babak masih muat di hari ini (sebelum end_time_str)
+      const cursorMin = cursor.getHours() * 60 + cursor.getMinutes();
+      if (cursorMin + roundDuration > dayEndMin && typeof window === "undefined") {
+        // Babak tidak muat di hari ini — log warning di server saja
+        console.warn(
+          `Babak ${roundNum} pada hari ${day.date} melebihi jam selesai (${day.end_time_str}). ` +
+          `Dibutuhkan ${roundDuration} menit, hanya tersisa ${dayEndMin - cursorMin} menit.`
+        );
+      }
+
+      const start = new Date(cursor);
+      const end = new Date(start.getTime() + roundDuration * 60_000);
+      schedule.push({ round: roundNum, start, end });
+      cursor = end;
+
+      // Istirahat antar babak
+      if (rounds.indexOf(roundNum) < rounds.length - 1) {
+        cursor = new Date(cursor.getTime() + restDuration * 60_000);
+      }
+    }
+  }
+
+  // Urutkan schedule berdasarkan round_number untuk konsistensi
+  schedule.sort((a, b) => a.round - b.round);
+  return schedule;
+}
+
+/**
  * Menghasilkan seluruh baris `matches` untuk sebuah bracket:
  * - Babak 1 diisi peserta hasil pengacakan (anti sesama-PB) + BYE otomatis menang.
  * - Babak selanjutnya dibuat KOSONG (garis-garis, menunggu pemenang babak sebelumnya),
  *   kecuali slot yang sudah pasti terisi karena BYE di babak 1.
  * - Jadwal jam tiap babak langsung dihitung di awal.
+ * - Mendukung multi-hari (schedule_days + round_assignments) jika disediakan.
  */
 export function generateMatchesForBracket(
   bracket: Bracket,
   participants: Participant[],
-  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = []
+  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = [],
+  scheduleDays: Pick<ScheduleDay, "id" | "date" | "start_time_str" | "end_time_str" | "day_index">[] = [],
+  roundAssignments: Pick<RoundAssignment, "round_number" | "schedule_day_id">[] = []
 ): { matches: MatchInsert[]; totalRounds: number; bracketSize: number; remainingCollisions: number } {
   const bracketSize = nextPowerOfTwo(participants.length);
   const totalRounds = Math.log2(bracketSize);
   const { slots, remainingCollisions } = arrangeSlotsAvoidingSameClub(participants, bracketSize);
-  const schedule = computeRoundSchedule(bracket, totalRounds, bracketSize, breakTimes);
+
+  // Gunakan multi-day schedule jika tersedia, jika tidak fallback ke single-day
+  const schedule =
+    scheduleDays.length > 0
+      ? computeRoundScheduleMultiDay(bracket, totalRounds, bracketSize, scheduleDays, roundAssignments, breakTimes)
+      : computeRoundSchedule(bracket, totalRounds, bracketSize, breakTimes);
 
   const matches: MatchInsert[] = [];
 
@@ -318,16 +455,28 @@ export function nextRoundTarget(matchIndex: number): {
  * Menghitung ulang jadwal (start_time, end_time) untuk semua pertandingan
  * berdasarkan konfigurasi bracket terbaru, TANPA mengubah peserta/posisi.
  * Mengembalikan map match_id → { start_time, end_time } yang baru.
+ * Mendukung multi-hari (schedule_days + round_assignments) jika disediakan.
  */
 export function recomputeMatchTimes(
   bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes" | "courts_count">,
   matches: { id: string; round_number: number; match_index: number }[],
-  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = []
+  breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = [],
+  scheduleDays: Pick<ScheduleDay, "id" | "date" | "start_time_str" | "end_time_str" | "day_index">[] = [],
+  roundAssignments: Pick<RoundAssignment, "round_number" | "schedule_day_id">[] = []
 ): Map<string, { start_time: string; end_time: string }> {
   const totalRounds = Math.max(...matches.map((m) => m.round_number), 1);
-  // BracketSize = 2^totalRounds, tapi untuk perhitungan jadwal kita hanya perlu totalRounds
   const bracketSize = Math.pow(2, totalRounds);
-  const schedule = computeRoundSchedule(bracket, totalRounds, bracketSize, breakTimes);
+
+  const schedule =
+    scheduleDays.length > 0
+      ? computeRoundScheduleMultiDay(bracket, totalRounds, bracketSize, scheduleDays, roundAssignments, breakTimes)
+      : computeRoundSchedule(bracket, totalRounds, bracketSize, breakTimes);
+
+  // Buat lookup schedule per round
+  const roundScheduleMap = new Map<number, RoundSchedule>();
+  for (const rs of schedule) {
+    roundScheduleMap.set(rs.round, rs);
+  }
 
   const courts = Math.max(1, bracket.courts_count);
   const waveSlotMs = (bracket.match_duration_minutes + bracket.rest_duration_minutes) * 60_000;
@@ -342,7 +491,7 @@ export function recomputeMatchTimes(
   }
 
   for (const [roundNum, roundMatches] of byRound) {
-    const roundSchedule = schedule[roundNum - 1];
+    const roundSchedule = roundScheduleMap.get(roundNum);
     if (!roundSchedule) continue;
 
     for (const match of roundMatches) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import type { Bracket, BreakTime, MatchRow, Participant } from "@/lib/types";
+import type { Bracket, BreakTime, MatchRow, Participant, ScheduleDay, RoundAssignment } from "@/lib/types";
 import BracketBoard from "@/components/BracketBoard";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
     notFound();
   }
 
-  const [{ data: participants }, { data: matches }, { data: breakTimes }] = await Promise.all([
+  const [{ data: participants }, { data: matches }, { data: breakTimes }, { data: scheduleDays }, { data: roundAssignments }] = await Promise.all([
     supabase.from("participants").select("*").eq("bracket_id", bracket.id).order("name").returns<Participant[]>(),
     supabase
       .from("matches")
@@ -36,11 +36,24 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
       .eq("bracket_id", bracket.id)
       .order("created_at")
       .returns<BreakTime[]>(),
+    supabase
+      .from("schedule_days")
+      .select("*")
+      .eq("bracket_id", bracket.id)
+      .order("day_index")
+      .returns<ScheduleDay[]>(),
+    supabase
+      .from("round_schedule_assignments")
+      .select("*")
+      .eq("bracket_id", bracket.id)
+      .returns<RoundAssignment[]>(),
   ]);
 
   const participantList = participants ?? [];
   const matchList = matches ?? [];
   const breakTimeList = breakTimes ?? [];
+  const scheduleDayList = scheduleDays ?? [];
+  const roundAssignmentList = roundAssignments ?? [];
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-10">
@@ -48,15 +61,37 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
   
         <h1 className="text-2xl font-display font-bold text-court-900 mt-1">{bracket.name}</h1>
         <p className="text-sm text-ink-500 mt-1">
-          Mulai{" "}
-          {new Date(bracket.start_time).toLocaleString("id-ID", {
-            dateStyle: "full",
-            timeStyle: "short",
-            timeZone: "Asia/Jakarta",
-          })}{" "}
-          &middot; {bracket.match_duration_minutes} menit/babak &middot; istirahat{" "}
+          {scheduleDayList.length > 1 ? (
+            <>{scheduleDayList.length} hari pelaksanaan &middot; </>
+          ) : (
+            <>
+              Mulai{" "}
+              {new Date(bracket.start_time).toLocaleString("id-ID", {
+                dateStyle: "full",
+                timeStyle: "short",
+                timeZone: "Asia/Jakarta",
+              })}{" "}
+            </>
+          )}
+          {bracket.match_duration_minutes} menit/babak &middot; istirahat{" "}
           {bracket.rest_duration_minutes} menit &middot; {bracket.courts_count ?? 1} lapangan
         </p>
+        {scheduleDayList.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {scheduleDayList.map((sd, i) => (
+              <span
+                key={sd.id}
+                className="inline-flex items-center gap-1 rounded-full bg-court-50 border border-court-200 px-2 py-0.5 text-xs text-court-700"
+              >
+                Hari {i + 1}: {new Date(sd.date + "T00:00:00").toLocaleDateString("id-ID", {
+                  day: "numeric",
+                  month: "short",
+                  timeZone: "Asia/Jakarta",
+                })} ({sd.start_time_str}–{sd.end_time_str})
+              </span>
+            ))}
+          </div>
+        )}
         {breakTimeList.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {breakTimeList.map((bt) => (
@@ -77,6 +112,8 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
           bracket={bracket}
           matches={matchList}
           participants={participantList}
+          scheduleDays={scheduleDayList}
+          roundAssignments={roundAssignmentList}
           readonly
         />
       ) : (
