@@ -16,18 +16,21 @@ export default function MatchBox({
   p1,
   p2,
   style,
+  readonly = false,
 }: {
   bracketId: string;
   match: MatchRow;
   p1: Participant | null;
   p2: Participant | null;
   style: React.CSSProperties;
+  readonly?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const router = useRouter();
 
   const canPick =
+    !readonly &&
     !isPending &&
     (!!p1 || !!p2) &&
     !match.participant1_is_bye &&

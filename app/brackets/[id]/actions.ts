@@ -507,3 +507,30 @@ export async function updateBracketNameAction(
   revalidatePath("/dashboard");
   return { success: "Nama turnamen berhasil diperbarui." };
 }
+
+export async function deleteAllParticipantsAction(bracketId: string) {
+  await requireAuth();
+  const supabase = getSupabaseServer();
+
+  // Hapus semua pertandingan terlebih dahulu (karena mereferensikan participants)
+  const { error: deleteMatchesError } = await supabase
+    .from("matches")
+    .delete()
+    .eq("bracket_id", bracketId);
+
+  if (deleteMatchesError) throw new Error(deleteMatchesError.message);
+
+  // Hapus semua peserta
+  const { error: deleteParticipantsError } = await supabase
+    .from("participants")
+    .delete()
+    .eq("bracket_id", bracketId);
+
+  if (deleteParticipantsError) throw new Error(deleteParticipantsError.message);
+
+  // Reset status bracket ke draft
+  await supabase.from("brackets").update({ status: "draft" }).eq("id", bracketId);
+
+  await logActivity("delete_all_participants", `Menghapus semua peserta dari bracket ${bracketId}`);
+  revalidatePath(`/brackets/${bracketId}`);
+}

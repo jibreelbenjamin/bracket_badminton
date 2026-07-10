@@ -33,8 +33,11 @@ create table if not exists brackets (
   rest_duration_minutes int not null default 15,
   courts_count int not null default 1,
   status text not null default 'draft', -- draft | generated
+  share_token uuid unique default gen_random_uuid(),
   created_at timestamptz not null default now()
 );
+
+create index if not exists brackets_share_token_idx on brackets(share_token);
 
 -- ---------------------------------------------------------
 -- participants: peserta dalam sebuah bracket
@@ -117,3 +120,10 @@ alter table participants enable row level security;
 alter table matches enable row level security;
 alter table break_times enable row level security;
 alter table activity_logs enable row level security;
+
+-- ---------------------------------------------------------
+-- MIGRASI: Jika database sudah ada sebelum fitur share ditambahkan,
+-- jalankan SQL berikut untuk menambahkan kolom share_token:
+-- ---------------------------------------------------------
+-- alter table brackets add column if not exists share_token uuid unique default gen_random_uuid();
+-- create index if not exists brackets_share_token_idx on brackets(share_token);

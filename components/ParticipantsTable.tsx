@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Pencil } from "lucide-react";
-import { deleteParticipantAction, updateParticipantAction } from "@/app/brackets/[id]/actions";
+import { deleteParticipantAction, deleteAllParticipantsAction, updateParticipantAction } from "@/app/brackets/[id]/actions";
 import type { Participant } from "@/lib/types";
 import AddParticipantForm from "./AddParticipantForm";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,12 @@ export default function ParticipantsTable({
               {club}: {count}
             </span>
           ))}
+        </div>
+      )}
+
+      {participants.length > 0 && (
+        <div className="mb-3 flex justify-end">
+          <DeleteAllParticipantsButton bracketId={bracketId} participantCount={participants.length} />
         </div>
       )}
 
@@ -218,6 +224,62 @@ function DeleteParticipantButton({
           <AlertDialogCancel>Batal</AlertDialogCancel>
           <AlertDialogAction onClick={handleDelete} disabled={isPending}>
             {isPending ? "Menghapus..." : "Ya, Hapus"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function DeleteAllParticipantsButton({
+  bracketId,
+  participantCount,
+}: {
+  bracketId: string;
+  participantCount: number;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const { setBracketLoading } = useBracketLoading();
+
+  function handleDeleteAll() {
+    startTransition(async () => {
+      try {
+        setBracketLoading(true);
+        await deleteAllParticipantsAction(bracketId);
+        toast.success(`Semua pasangan peserta (${participantCount}) berhasil dihapus.`);
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Gagal menghapus semua pasangan peserta.");
+      } finally {
+        setBracketLoading(false);
+      }
+    });
+  }
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button
+          disabled={isPending}
+          className="text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50 font-medium"
+          title="Hapus semua pasangan peserta"
+        >
+          {isPending ? "Menghapus..." : "Hapus Semua"}
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Hapus semua pasangan peserta?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Semua {participantCount} pasangan peserta dan seluruh data pertandingan akan ikut
+            terhapus. Tindakan ini tidak bisa dibatalkan.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Batal</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteAll} disabled={isPending}>
+            {isPending ? "Menghapus..." : "Ya, Hapus Semua"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -14,6 +14,7 @@ export type Bracket = {
   rest_duration_minutes: number;
   courts_count: number;
   status: "draft" | "generated";
+  share_token: string | null;
   created_at: string;
 };
 

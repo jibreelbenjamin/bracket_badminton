@@ -8,6 +8,7 @@ import { roundLabel } from "@/lib/bracket-logic";
 import type { Bracket, MatchRow, Participant } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import MatchBox from "./MatchBox";
+import ShareBracketButton from "./ShareBracketButton";
 import WinnerDialog, { type WinnerDialogHandle } from "./WinnerDialog";
 import { useBracketLoading } from "./BracketLoadingProvider";
 
@@ -20,10 +21,12 @@ export default function BracketBoard({
   bracket,
   matches,
   participants,
+  readonly = false,
 }: {
   bracket: Bracket;
   matches: MatchRow[];
   participants: Participant[];
+  readonly?: boolean;
 }) {
   const exportRef = useRef<HTMLDivElement>(null);
   const fullscreenRef = useRef<HTMLDivElement>(null);
@@ -111,6 +114,7 @@ export default function BracketBoard({
             )}
             {isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh"}
           </Button>
+          <ShareBracketButton bracketId={bracket.id} currentShareToken={bracket.share_token} />
           <Button
             onClick={handleExport}
             disabled={exporting}
@@ -188,6 +192,7 @@ export default function BracketBoard({
                         p1={match.participant1_id ? participantMap.get(match.participant1_id) ?? null : null}
                         p2={match.participant2_id ? participantMap.get(match.participant2_id) ?? null : null}
                         style={{ top: center - BOX_HEIGHT / 2, height: BOX_HEIGHT }}
+                        readonly={readonly}
                       />
                     );
                   })}

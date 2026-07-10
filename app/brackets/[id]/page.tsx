@@ -117,11 +117,13 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
               <ScheduleEditor bracket={bracket} breakTimes={breakTimeList} />
             </div>
           </div>
-          <GenerateBracketButton
-            bracketId={bracket.id}
-            hasMatches={matchList.length > 0}
-            participantCount={participantList.length}
-          />
+          <div className="flex items-center gap-2">
+            <GenerateBracketButton
+              bracketId={bracket.id}
+              hasMatches={matchList.length > 0}
+              participantCount={participantList.length}
+            />
+          </div>
         </div>
 
         {matchList.length > 0 && (participantChanges.newCount > 0 || participantChanges.removedCount > 0) && (

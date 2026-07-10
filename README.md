@@ -36,6 +36,8 @@ confetti saat final, dan unduh bagan sebagai gambar resolusi tinggi. Dibangun de
   begitu diklik, otomatis maju ke kotak berikutnya.
 - **Efek confetti** 🎉 — saat pemenang final dipilih, efek confetti otomatis muncul sebagai
   perayaan!
+- **Bagikan bracket** — generate link share yang bisa diakses siapa saja tanpa PIN (read-only).
+  Link bisa di-regenerate (ganti token) atau di-revoke (nonaktifkan) kapan saja.
 - **Unduh gambar HD** — bagan lengkap bisa diunduh sebagai PNG resolusi tinggi (3x), siap
   dicetak atau dibagikan di grup WhatsApp.
 - **Log aktivitas server-side** — setiap aksi penting (login, buat/hapus bracket, generate
@@ -88,7 +90,11 @@ Isi `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=isi-dengan-service-role-key-anda
 APP_SESSION_SECRET=isi-dengan-string-acak-panjang
+NEXT_PUBLIC_SITE_URL=https://turnamen-anda.vercel.app
 ```
+
+> `NEXT_PUBLIC_SITE_URL` opsional — digunakan untuk membuat URL share bracket. Jika tidak
+> diisi, fallback ke `http://localhost:3000` (cocok untuk development lokal).
 
 Untuk membuat `APP_SESSION_SECRET` acak, jalankan:
 
@@ -198,25 +204,29 @@ app/
   dashboard/           Daftar semua bracket
   brackets/new/        Form buat bracket baru
   brackets/[id]/       Detail bracket: peserta, pengacakan, editor jadwal, tampilan bagan
+  share/[token]/       Halaman bagan yang dibagikan (read-only, tanpa PIN)
   settings/            Ganti PIN & nilai default (durasi, jumlah lapangan)
 components/
   ui/                  Komponen UI dasar (button, dialog, input, select, dll.)
-  BracketBoard.tsx     Papan bagan utama dengan ekspor PNG
+  BracketBoard.tsx     Papan bagan utama (fullscreen, ekspor PNG, tombol share)
   BracketList.tsx      Daftar bracket di dashboard
   BracketNameEditor.tsx  Dialog ganti nama bracket
   CreateBracketForm.tsx  Form buat bracket baru
   AddParticipantForm.tsx      Form tambah peserta manual
   ImportParticipantsForm.tsx  Form import peserta dari Excel
   ParticipantsTable.tsx       Tabel daftar peserta
-  GenerateBracketButton.tsx   Tombol generate bagan
+  GenerateBracketButton.tsx   Tombol generate / acak ulang bagan
+  ShareBracketButton.tsx      Tombol bagikan bracket (generate/regenerate/revoke link)
   ScheduleEditor.tsx          Dialog editor jadwal (jam mulai, durasi, lapangan, istirahat)
   DeleteBracketButton.tsx     Tombol hapus bracket
   MatchBox.tsx                Kotak pertandingan individual di bagan
   WinnerDialog.tsx            Dialog konfirmasi pemenang + efek confetti
   ParticipantChangeAlert.tsx  Alert saat peserta berubah setelah bagan sudah jadi
+  BracketLoadingProvider.tsx  Context provider untuk loading state bagan
   NavigationProgress.tsx      Indikator progress langkah (peserta → jadwal → bagan)
   DatePicker.tsx / TimePicker.tsx  Komponen input tanggal & jam
   PinForm.tsx / LogoutButton.tsx    Komponen autentikasi
+  SettingsForm.tsx            Form pengaturan (ganti PIN, nilai default)
 lib/
   bracket-logic.ts    Algoritma inti: pengacakan anti-sesama-PB, BYE, penjadwalan multi-lapangan
   excel.ts            Parser file Excel peserta
