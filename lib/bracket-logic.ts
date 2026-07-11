@@ -128,6 +128,31 @@ function timeStrToMinutes(t: string): number {
   return h * 60 + m;
 }
 
+/** WIB offset in minutes (Asia/Jakarta = UTC+7). */
+const WIB_OFFSET_MINUTES = 7 * 60;
+
+/**
+ * Dapatkan menit sejak tengah malam dalam zona WIB (Asia/Jakarta)
+ * dari sebuah objek Date, terlepas dari timezone server.
+ */
+function getWIBMinutes(date: Date): number {
+  const wibTime = date.getTime() + WIB_OFFSET_MINUTES * 60_000;
+  const totalMinutes = Math.floor(wibTime / 60_000);
+  return totalMinutes % (24 * 60);
+}
+
+/**
+ * Set jam dan menit pada Date dalam zona WIB, mengembalikan Date baru.
+ */
+function setWIBTime(date: Date, hours: number, minutes: number, seconds: number, ms: number): Date {
+  const targetWIBMinutes = hours * 60 + minutes;
+  const utcTargetMinutes = targetWIBMinutes - WIB_OFFSET_MINUTES;
+  const normalizedMinutes = ((utcTargetMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const newDate = new Date(date);
+  newDate.setUTCHours(Math.floor(normalizedMinutes / 60), normalizedMinutes % 60, seconds, ms);
+  return newDate;
+}
+
 /**
  * Cek apakah sebuah titik waktu (Date) berada di dalam rentang break_time
  * tertentu (berdasarkan jam-menit dalam sehari). Jika ya, kembalikan Date
@@ -135,13 +160,11 @@ function timeStrToMinutes(t: string): number {
  * Date asli.
  */
 function skipBreakIfInside(cursor: Date, breaks: { startMin: number; endMin: number }[]): Date {
-  const cursorMin = cursor.getHours() * 60 + cursor.getMinutes();
+  const cursorMin = getWIBMinutes(cursor);
   for (const b of breaks) {
     if (cursorMin >= b.startMin && cursorMin < b.endMin) {
-      // Maju ke akhir break
-      const newDate = new Date(cursor);
-      newDate.setHours(Math.floor(b.endMin / 60), b.endMin % 60, 0, 0);
-      return newDate;
+      // Maju ke akhir break (dalam WIB)
+      return setWIBTime(cursor, Math.floor(b.endMin / 60), b.endMin % 60, 0, 0);
     }
   }
   return cursor;
@@ -158,16 +181,14 @@ function avoidBreakOverlap(
   durationMinutes: number,
   breaks: { startMin: number; endMin: number }[]
 ): Date {
-  const startMin = startDate.getHours() * 60 + startDate.getMinutes();
+  const startMin = getWIBMinutes(startDate);
   const endMin = startMin + durationMinutes;
 
   for (const b of breaks) {
     // Apakah rentang pertandingan tumpang-tindih dengan break?
     if (startMin < b.endMin && endMin > b.startMin) {
-      // Mulai pertandingan setelah break selesai
-      const newDate = new Date(startDate);
-      newDate.setHours(Math.floor(b.endMin / 60), b.endMin % 60, 0, 0);
-      return newDate;
+      // Mulai pertandingan setelah break selesai (dalam WIB)
+      return setWIBTime(startDate, Math.floor(b.endMin / 60), b.endMin % 60, 0, 0);
     }
   }
   return startDate;
@@ -450,10 +471,10 @@ export function computeRoundScheduleMultiDay(
       const end = new Date(lastWaveStart.getTime() + matchDuration * 60_000);
 
       // Cek apakah babak masih muat di hari ini (sebelum end_time_str)
-      const endMin = end.getHours() * 60 + end.getMinutes();
+      const endMin = getWIBMinutes(end);
       if (endMin > dayEndMin && typeof window === "undefined") {
-        const roundDuration = endMin - (start.getHours() * 60 + start.getMinutes());
-        const cursorMin = start.getHours() * 60 + start.getMinutes();
+        const roundDuration = endMin - getWIBMinutes(start);
+        const cursorMin = getWIBMinutes(start);
         console.warn(
           `Babak ${roundNum} pada hari ${day.date} melebihi jam selesai (${day.end_time_str}). ` +
           `Dibutuhkan ${roundDuration} menit, hanya tersisa ${dayEndMin - cursorMin} menit.`
