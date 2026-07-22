@@ -133,6 +133,18 @@ export default function BracketBoard({
   const champion =
     finalMatch?.winner_id ? participantMap.get(finalMatch.winner_id) ?? null : null;
 
+  // Cari pertandingan perebutan juara 3
+  const thirdPlaceMatch = matches.find((m) => m.is_third_place);
+  const thirdPlaceP1 = thirdPlaceMatch?.participant1_id
+    ? participantMap.get(thirdPlaceMatch.participant1_id) ?? null
+    : null;
+  const thirdPlaceP2 = thirdPlaceMatch?.participant2_id
+    ? participantMap.get(thirdPlaceMatch.participant2_id) ?? null
+    : null;
+  const thirdPlaceWinner = thirdPlaceMatch?.winner_id
+    ? participantMap.get(thirdPlaceMatch.winner_id) ?? null
+    : null;
+
   async function handleExport() {
     if (!exportRef.current) return;
     setExporting(true);
@@ -228,6 +240,7 @@ export default function BracketBoard({
             const roundMatches = roundsMap.get(roundNum) ?? [];
             const spacing = MATCH_HEIGHT * Math.pow(2, roundNum - 1);
             const isLastRound = roundNum === totalRounds;
+            const isSemifinal = roundNum === totalRounds - 1;
             const first = roundMatches[0];
             const last = roundMatches[roundMatches.length - 1];
 
@@ -286,6 +299,78 @@ export default function BracketBoard({
                         />
                       );
                     })}
+
+                  {/* Pertandingan Perebutan Juara 3 — di atas pertandingan Semifinal */}
+                  {isSemifinal && thirdPlaceMatch && (() => {
+                    const firstMatchTop = spacing * 0.5 - BOX_HEIGHT / 2;
+                    // Posisi dari atas round-body, pastikan tidak negatif
+                    const thirdPlaceTop = Math.max(6, firstMatchTop - BOX_HEIGHT - 210);
+                    const thirdPlaceBottom = thirdPlaceTop + BOX_HEIGHT;
+                    return (
+                      <>
+                        {/* Garis pemisah putus-putus */}
+                        <div
+                          className="absolute left-0 right-10 border-t-2 border-dashed border-amber-300/60"
+                          style={{ top: Math.max(0, thirdPlaceTop - 35) }}
+                        />
+                        {/* Label badge */}
+                        <div
+                          className="absolute left-0 flex justify-center"
+                          style={{ top: Math.max(2, thirdPlaceTop - 16) }}
+                        >
+                          <div className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-300 rounded-lg px-3 py-0.5 shadow-sm">
+                            <span className="text-xs">🥉</span>
+                            <span className="text-[10px] font-bold text-amber-800 tracking-wide">
+                              Perebutan Juara 3
+                            </span>
+                          </div>
+                        </div>
+                        {/* Info waktu */}
+                        {/* {thirdPlaceMatch.start_time && thirdPlaceMatch.end_time && (
+                          <div
+                            className="absolute left-0 right-0 text-center"
+                            style={{ top: thirdPlaceTop + 10 }}
+                          >
+                            <span className="text-[10px] text-ink-400">
+                              {formatTime(thirdPlaceMatch.start_time)} – {formatTime(thirdPlaceMatch.end_time)}
+                            </span>
+                          </div>
+                        )} */}
+                        {/* Kotak pertandingan */}
+                        <MatchBox
+                          bracketId={bracket.id}
+                          match={thirdPlaceMatch}
+                          p1={thirdPlaceP1}
+                          p2={thirdPlaceP2}
+                          style={{
+                            top: thirdPlaceTop + 14,
+                            height: BOX_HEIGHT,
+                          }}
+                          readonly={readonly}
+                          matchNumber={undefined}
+                        />
+                        {/* Label pemenang */}
+                        {/* {thirdPlaceWinner && (
+                          <div
+                            className="absolute left-0 right-0 flex justify-center"
+                            style={{ top: thirdPlaceBottom + 4 }}
+                          >
+                            <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-0.5 shadow-sm">
+                              <span className="text-[10px]">🥉</span>
+                              <span className="text-[10px] font-bold text-amber-800">
+                                {thirdPlaceWinner.name}
+                              </span>
+                              {thirdPlaceWinner.club_name && (
+                                <span className="text-[9px] text-ink-400">
+                                  · {thirdPlaceWinner.club_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )} */}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             );

@@ -405,10 +405,118 @@ export async function setWinnerAction(bracketId: string, matchId: string, partic
       // Jangan auto-resolve di babak > 1 — biarkan user toggle manual
       // agar tidak auto-juara sebelum lawan dari sisi bracket lain terisi.
     }
+
+    // Propagasi loser semifinal ke pertandingan juara 3
+    await propagateSemifinalLoserToThirdPlace(
+      supabase,
+      bracketId,
+      match,
+      newWinnerId
+    );
+  } else {
+    // Jika pemenang dibatalkan, hapus juga peserta dari juara 3
+    await clearThirdPlaceSlot(supabase, bracketId, match);
   }
 
   await logActivity("set_winner", `Set pemenang match ${matchId} di bracket ${bracketId}`);
   revalidatePath(`/brackets/${bracketId}`);
+}
+
+/**
+ * Ketika pemenang semifinal ditentukan, loser-nya dimasukkan ke
+ * pertandingan perebutan juara 3 (jika ada).
+ */
+async function propagateSemifinalLoserToThirdPlace(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  bracketId: string,
+  match: MatchRow,
+  winnerId: string
+): Promise<void> {
+  // Cari total rounds bracket ini
+  const { data: allMatches } = await supabase
+    .from("matches")
+    .select("round_number")
+    .eq("bracket_id", bracketId)
+    .eq("is_third_place", false)
+    .order("round_number", { ascending: false })
+    .limit(1)
+    .returns<{ round_number: number }[]>();
+
+  if (!allMatches || allMatches.length === 0) return;
+  const totalRounds = allMatches[0].round_number;
+
+  // Hanya propagate dari semifinal (round = totalRounds - 1)
+  if (match.round_number !== totalRounds - 1) return;
+
+  // Tentukan loser
+  const loserId =
+    match.participant1_id === winnerId
+      ? match.participant2_id
+      : match.participant1_id;
+
+  if (!loserId) return;
+
+  // Cari pertandingan juara 3
+  const { data: thirdPlaceMatch } = await supabase
+    .from("matches")
+    .select("id, participant1_id, participant2_id")
+    .eq("bracket_id", bracketId)
+    .eq("is_third_place", true)
+    .maybeSingle<{ id: string; participant1_id: string | null; participant2_id: string | null }>();
+
+  if (!thirdPlaceMatch) return;
+
+  // Tentukan slot: match_index ganjil/genap dari semifinal
+  // Semifinal match_index 0 → slot participant1_id, match_index 1 → participant2_id
+  const slot =
+    match.match_index % 2 === 0 ? "participant1_id" : "participant2_id";
+
+  await supabase
+    .from("matches")
+    .update({ [slot]: loserId, winner_id: null })
+    .eq("id", thirdPlaceMatch.id);
+}
+
+/**
+ * Hapus slot peserta dari pertandingan juara 3 ketika pemenang semifinal
+ * dibatalkan/diubah.
+ */
+async function clearThirdPlaceSlot(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  bracketId: string,
+  match: MatchRow
+): Promise<void> {
+  // Hanya relevan untuk semifinal
+  const { data: allMatches } = await supabase
+    .from("matches")
+    .select("round_number")
+    .eq("bracket_id", bracketId)
+    .eq("is_third_place", false)
+    .order("round_number", { ascending: false })
+    .limit(1)
+    .returns<{ round_number: number }[]>();
+
+  if (!allMatches || allMatches.length === 0) return;
+  const totalRounds = allMatches[0].round_number;
+
+  if (match.round_number !== totalRounds - 1) return;
+
+  const slot =
+    match.match_index % 2 === 0 ? "participant1_id" : "participant2_id";
+
+  const { data: thirdPlaceMatch } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("bracket_id", bracketId)
+    .eq("is_third_place", true)
+    .maybeSingle<{ id: string }>();
+
+  if (thirdPlaceMatch) {
+    await supabase
+      .from("matches")
+      .update({ [slot]: null, winner_id: null })
+      .eq("id", thirdPlaceMatch.id);
+  }
 }
 
 /** Validasi string HH:mm */

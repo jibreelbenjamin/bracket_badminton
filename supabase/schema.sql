@@ -67,6 +67,7 @@ create table if not exists matches (
   winner_id uuid references participants(id) on delete set null,
   start_time timestamptz,
   end_time timestamptz,
+  is_third_place boolean not null default false,
   created_at timestamptz not null default now(),
   unique (bracket_id, round_number, match_index)
 );
@@ -160,3 +161,8 @@ alter table activity_logs enable row level security;
 -- ---------------------------------------------------------
 -- alter table brackets add column if not exists share_token uuid unique default gen_random_uuid();
 -- create index if not exists brackets_share_token_idx on brackets(share_token);
+
+-- ---------------------------------------------------------
+-- MIGRASI: Tambah kolom is_third_place untuk fitur perebutan juara 3
+-- ---------------------------------------------------------
+-- alter table matches add column if not exists is_third_place boolean not null default false;

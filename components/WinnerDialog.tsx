@@ -25,7 +25,7 @@ function determineWinners(
   if (totalRounds < 2) return null;
 
   const finalMatch = matches.find(
-    (m) => m.round_number === totalRounds && m.match_index === 0
+    (m) => m.round_number === totalRounds && m.match_index === 0 && !m.is_third_place
   );
   if (!finalMatch || !finalMatch.winner_id) return null;
 
@@ -38,24 +38,35 @@ function determineWinners(
       : finalMatch.participant1_id;
   const second = finalLoserId ? participantMap.get(finalLoserId) ?? null : null;
 
-  const semifinalMatches = matches.filter(
-    (m) => m.round_number === totalRounds - 1
-  );
-  const finalistIds = new Set([
-    finalMatch.participant1_id,
-    finalMatch.participant2_id,
-  ]);
-  const third: Participant[] = [];
+  // Cari pertandingan juara 3 yang sebenarnya
+  const thirdPlaceMatch = matches.find((m) => m.is_third_place);
 
-  for (const sm of semifinalMatches) {
-    if (!sm.winner_id) continue;
-    const loserId =
-      sm.participant1_id === sm.winner_id
-        ? sm.participant2_id
-        : sm.participant1_id;
-    if (loserId && !finalistIds.has(loserId)) {
-      const p = participantMap.get(loserId);
-      if (p) third.push(p);
+  let third: Participant[] = [];
+
+  if (thirdPlaceMatch && thirdPlaceMatch.winner_id) {
+    // Ada pertandingan juara 3 & sudah ada pemenangnya
+    const tpWinner = participantMap.get(thirdPlaceMatch.winner_id) ?? null;
+    if (tpWinner) third = [tpWinner];
+  } else {
+    // Fallback: tentukan dari loser semifinal (cara lama)
+    const semifinalMatches = matches.filter(
+      (m) => m.round_number === totalRounds - 1
+    );
+    const finalistIds = new Set([
+      finalMatch.participant1_id,
+      finalMatch.participant2_id,
+    ]);
+
+    for (const sm of semifinalMatches) {
+      if (!sm.winner_id) continue;
+      const loserId =
+        sm.participant1_id === sm.winner_id
+          ? sm.participant2_id
+          : sm.participant1_id;
+      if (loserId && !finalistIds.has(loserId)) {
+        const p = participantMap.get(loserId);
+        if (p) third.push(p);
+      }
     }
   }
 

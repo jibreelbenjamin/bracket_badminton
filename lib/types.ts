@@ -38,6 +38,7 @@ export type MatchRow = {
   winner_id: string | null;
   start_time: string | null;
   end_time: string | null;
+  is_third_place: boolean;
   created_at: string;
 };
 
