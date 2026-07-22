@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import NavigationProgress from "@/components/NavigationProgress";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Bracket Badminton",
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </footer>
         <Toaster />
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
