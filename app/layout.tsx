@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="text-center py-4 text-sm text-ink-300 border-t border-court-200/50">
           <p>
             &copy; {new Date().getFullYear()} Jibreel Benjamin
-            {process.env.NEXT_PUBLIC_APP_VERSION && (
+            {process.env.NEXT_PUBLIC_APP_VERSION && /^\d+\.\d+\.\d+$/.test(process.env.NEXT_PUBLIC_APP_VERSION) && (
               <> &mdash; v{process.env.NEXT_PUBLIC_APP_VERSION}</>
             )}
           </p>

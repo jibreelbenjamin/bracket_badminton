@@ -271,7 +271,9 @@ export default function BracketBoard({
                 </div>
 
                 <div className="round-body" style={{ height: totalHeight }}>
-                  {roundMatches.map((match) => {
+                  {roundMatches
+                    .filter((m) => !m.is_third_place)
+                    .map((match) => {
                     const center = spacing * (match.match_index + 0.5);
                     return (
                       <MatchBox

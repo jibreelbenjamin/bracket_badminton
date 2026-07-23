@@ -20,6 +20,27 @@ export async function importParticipantsAction(
     return { error: "Pilih file Excel (.xlsx) terlebih dahulu." };
   }
 
+  // Validasi ekstensi file
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith(".xlsx") && !fileName.endsWith(".xls")) {
+    return { error: "Format file harus .xlsx atau .xls." };
+  }
+
+  // Validasi MIME type
+  const allowedMimes = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+  ];
+  if (!allowedMimes.includes(file.type)) {
+    return { error: "Tipe file tidak valid. Pastikan file Excel .xlsx atau .xls." };
+  }
+
+  // Validasi ukuran file (maks 5 MB)
+  const MAX_FILE_SIZE = 5 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    return { error: "Ukuran file maksimal 5 MB." };
+  }
+
   let parsed;
   try {
     const buffer = await file.arrayBuffer();

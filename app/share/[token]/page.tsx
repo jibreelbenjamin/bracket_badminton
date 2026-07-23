@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-log";
 import type { Bracket, BreakTime, MatchRow, Participant, ScheduleDay, RoundAssignment } from "@/lib/types";
 import BracketBoard from "@/components/BracketBoard";
 
@@ -16,6 +17,11 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
     .select("*")
     .eq("share_token", token)
     .single<Bracket>();
+
+  // Log akses ke public share link (fire-and-forget)
+  if (bracket) {
+    logActivity("view_shared_bracket", `Melihat public link bracket "${bracket.name}"`);
+  }
 
   if (error || !bracket) {
     notFound();
