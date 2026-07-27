@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log";
-import { hashPin } from "@/lib/pin-hash";
 import type { ActionState } from "@/lib/types";
 
 export async function updateSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -30,7 +29,7 @@ export async function updateSettingsAction(_prevState: ActionState, formData: Fo
   const { error } = await supabase
     .from("app_settings")
     .update({
-      pin: hashPin(pin),
+      pin, // plaintext
       default_match_duration_minutes: matchDuration,
       default_rest_duration_minutes: restDuration,
       default_courts_count: courtsCount,

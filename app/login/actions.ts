@@ -6,7 +6,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { createSessionCookieValue, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { checkLoginRateLimit, recordLoginAttempt } from "@/lib/rate-limit";
-import { verifyPin, needsRehash, hashPin } from "@/lib/pin-hash";
+import { verifyPin } from "@/lib/pin-hash";
 import type { ActionState } from "@/lib/types";
 
 export async function loginAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -40,11 +40,6 @@ export async function loginAction(_prevState: ActionState, formData: FormData): 
     await recordLoginAttempt(false);
     await logActivity("login_failed", "PIN salah");
     return { error: "PIN salah. Coba lagi." };
-  }
-
-  // Upgrade hash jika masih plaintext (migrasi otomatis)
-  if (needsRehash(data.pin)) {
-    await supabase.from("app_settings").update({ pin: hashPin(pin) }).eq("id", 1);
   }
 
   // Login berhasil — reset counter dengan mencatat attempt sukses
