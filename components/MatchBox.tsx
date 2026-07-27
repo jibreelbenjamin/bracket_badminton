@@ -18,6 +18,11 @@ function formatDate(iso: string) {
   });
 }
 
+function getCourtNumber(match: MatchRow, courtsCount: number): number | null {
+  if (courtsCount <= 1) return null;
+  return (match.match_index % courtsCount) + 1;
+}
+
 export default function MatchBox({
   bracketId,
   match,
@@ -26,6 +31,7 @@ export default function MatchBox({
   style,
   readonly = false,
   matchNumber,
+  courtsCount = 1,
 }: {
   bracketId: string;
   match: MatchRow;
@@ -34,7 +40,9 @@ export default function MatchBox({
   style: React.CSSProperties;
   readonly?: boolean;
   matchNumber?: number;
+  courtsCount?: number;
 }) {
+  const courtNumber = getCourtNumber(match, courtsCount);
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const router = useRouter();
@@ -69,10 +77,12 @@ export default function MatchBox({
     >
       <div className="match-time">
         {match.start_time && match.end_time
-          ? <>{matchNumber != null ? <span className="font-extrabold">#{matchNumber} -</span> : null} {formatDate(match.start_time)},  {formatTime(match.start_time)}-{formatTime(match.end_time)}</>
+          ? <>{matchNumber != null ? <span className="font-extrabold">#{matchNumber}</span> : null}{courtNumber != null ? <span className="text-cork-600 font-bold"> L{courtNumber}</span> : null} {matchNumber != null ? <span className="mx-0.5">·</span> : null} {formatDate(match.start_time)}, {formatTime(match.start_time)}-{formatTime(match.end_time)}</>
           : matchNumber != null
-            ? <span className="font-bold">#{matchNumber}</span>
-            : null}
+            ? <><span className="font-bold">#{matchNumber}</span>{courtNumber != null ? <span className="text-cork-600 font-bold ml-1">L{courtNumber}</span> : null}</>
+            : courtNumber != null
+              ? <span className="text-cork-600 font-bold">Lapangan {courtNumber}</span>
+              : null}
       </div>
       {isPending && (
         <div className="match-box__loading-overlay">

@@ -145,14 +145,27 @@ export default function BracketBoard({
     ? participantMap.get(thirdPlaceMatch.winner_id) ?? null
     : null;
 
+  async function getFontEmbedCSS(): Promise<string> {
+    try {
+      const res = await fetch(
+        "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap"
+      );
+      return await res.text();
+    } catch {
+      return "";
+    }
+  }
+
   async function handleExport() {
     if (!exportRef.current) return;
     setExporting(true);
     try {
+      const fontEmbedCSS = await getFontEmbedCSS();
       const dataUrl = await toPng(exportRef.current, {
         pixelRatio: 3,
         backgroundColor: "#ffffff",
         cacheBust: true,
+        fontEmbedCSS,
       });
       const link = document.createElement("a");
       const safeName = bracket.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
@@ -285,6 +298,7 @@ export default function BracketBoard({
                         style={{ top: center - BOX_HEIGHT / 2, height: BOX_HEIGHT }}
                         readonly={readonly}
                         matchNumber={matchNumberMap.get(match.id)}
+                        courtsCount={bracket.courts_count}
                       />
                     );
                   })}
@@ -322,7 +336,7 @@ export default function BracketBoard({
                         >
                           <div className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-300 rounded-lg px-3 py-0.5 shadow-sm">
                             <span className="text-xs">🥉</span>
-                            <span className="text-[10px] font-bold text-amber-800 tracking-wide">
+                            <span className="text-nowrap text-[10px] font-bold text-amber-800 tracking-wide">
                               Perebutan Juara 3
                             </span>
                           </div>
@@ -349,7 +363,8 @@ export default function BracketBoard({
                             height: BOX_HEIGHT,
                           }}
                           readonly={readonly}
-                          matchNumber={undefined}
+                          matchNumber={matchNumberMap.get(thirdPlaceMatch.id)}
+                          courtsCount={bracket.courts_count}
                         />
                         {/* Label pemenang */}
                         {/* {thirdPlaceWinner && (
