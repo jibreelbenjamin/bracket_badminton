@@ -13,6 +13,7 @@ export type Bracket = {
   match_duration_minutes: number;
   rest_duration_minutes: number;
   courts_count: number;
+  third_place_gap_minutes: number;
   status: "draft" | "generated";
   share_token: string | null;
   created_at: string;

@@ -339,8 +339,8 @@ export default function ScheduleEditor({
             </div>
           )}
 
-          {/* Durasi, Istirahat, Lapangan */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Durasi, Istirahat, Lapangan, Jeda Juara 3 */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <Label htmlFor="match_duration_minutes" className="mb-1 block text-xs text-ink-700">
                 Durasi/Babak (menit)
@@ -385,6 +385,24 @@ export default function ScheduleEditor({
                 disabled={pending}
                 className="bg-court-50"
               />
+            </div>
+            <div>
+              <Label htmlFor="third_place_gap_minutes" className="mb-1 block text-xs text-ink-700">
+                Jeda Semifinal ke Juara 3 (menit)
+              </Label>
+              <Input
+                id="third_place_gap_minutes"
+                type="number"
+                name="third_place_gap_minutes"
+                min={0}
+                defaultValue={bracket.third_place_gap_minutes ?? 0}
+                required
+                disabled={pending}
+                className="bg-court-50"
+              />
+              <p className="text-[9px] text-ink-400 mt-0.5 leading-tight">
+                Jarak antara selesai semifinal dengan mulai pertandingan juara 3.
+              </p>
             </div>
           </div>
 

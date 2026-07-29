@@ -45,17 +45,17 @@ type Preset = {
 
 const COLOR_PRESETS: Preset[] = [
   // Hijau (default)
-  { matchboxBg: "#f2f9f7", matchboxBorder: "#dbeee9", lineColor: "#bfe0d8", fontColorPrimary: "#16221f", fontColorSecondary: "#5b6b67", fontColorAccent: "#185f52", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#185f52", roundTimeColor: "#185f52", label: "Hijau" },
+  { matchboxBg: "#eaf7f3", matchboxBorder: "#7fc1b0", lineColor: "#bfe0d8", fontColorPrimary: "#16221f", fontColorSecondary: "#5b6b67", fontColorAccent: "#185f52", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#185f52", roundTimeColor: "#185f52", label: "Hijau" },
   // Biru
-  { matchboxBg: "#eff6ff", matchboxBorder: "#dbeafe", lineColor: "#bfdbfe", fontColorPrimary: "#172554", fontColorSecondary: "#4b5563", fontColorAccent: "#1d4ed8", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#1d4ed8", roundTimeColor: "#1d4ed8", label: "Biru" },
+  { matchboxBg: "#eaf1ff", matchboxBorder: "#7da9e8", lineColor: "#bfdbfe", fontColorPrimary: "#172554", fontColorSecondary: "#4b5563", fontColorAccent: "#1d4ed8", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#1d4ed8", roundTimeColor: "#1d4ed8", label: "Biru" },
   // Ungu
-  { matchboxBg: "#faf5ff", matchboxBorder: "#e9d5ff", lineColor: "#d8b4fe", fontColorPrimary: "#2e1065", fontColorSecondary: "#6b5563", fontColorAccent: "#7c3aed", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#7c3aed", roundTimeColor: "#7c3aed", label: "Ungu" },
+  { matchboxBg: "#f5edff", matchboxBorder: "#b794e0", lineColor: "#d8b4fe", fontColorPrimary: "#2e1065", fontColorSecondary: "#6b5563", fontColorAccent: "#7c3aed", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#7c3aed", roundTimeColor: "#7c3aed", label: "Ungu" },
   // Orange
-  { matchboxBg: "#fff7ed", matchboxBorder: "#ffedd5", lineColor: "#fed7aa", fontColorPrimary: "#431407", fontColorSecondary: "#6b5b4f", fontColorAccent: "#ea580c", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#ea580c", roundTimeColor: "#ea580c", label: "Orange" },
+  { matchboxBg: "#fff2e0", matchboxBorder: "#e8965c", lineColor: "#fed7aa", fontColorPrimary: "#431407", fontColorSecondary: "#6b5b4f", fontColorAccent: "#ea580c", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#ea580c", roundTimeColor: "#ea580c", label: "Orange" },
   // Kuning
-  { matchboxBg: "#fefce8", matchboxBorder: "#fef08a", lineColor: "#fde047", fontColorPrimary: "#422006", fontColorSecondary: "#713f12", fontColorAccent: "#a16207", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#a16207", roundTimeColor: "#a16207", label: "Kuning" },
+  { matchboxBg: "#fef9d7", matchboxBorder: "#e8c84a", lineColor: "#fde047", fontColorPrimary: "#422006", fontColorSecondary: "#713f12", fontColorAccent: "#a16207", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#a16207", roundTimeColor: "#a16207", label: "Kuning" },
   // Abu-abu
-  { matchboxBg: "#f9fafb", matchboxBorder: "#e5e7eb", lineColor: "#d1d5db", fontColorPrimary: "#111827", fontColorSecondary: "#6b7280", fontColorAccent: "#374151", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#374151", roundTimeColor: "#374151", label: "Abu-abu" },
+  { matchboxBg: "#f3f4f6", matchboxBorder: "#9ca3af", lineColor: "#d1d5db", fontColorPrimary: "#111827", fontColorSecondary: "#6b7280", fontColorAccent: "#374151", bgColor: "#ffffff", courtTextColor: "#9c6708", roundTitleColor: "#374151", roundTimeColor: "#374151", label: "Abu-abu" },
 ];
 
 export default function BracketStyleDialog({ style, onApply }: Props) {
@@ -365,7 +365,7 @@ export default function BracketStyleDialog({ style, onApply }: Props) {
               className="rounded-xl p-4 flex flex-col items-center gap-4"
               style={{ background: local.bgColor, border: "1.5px solid", borderColor: local.matchboxBorder }}
             >
-              {/* Contoh Round Header */}
+              {/* Contoh Round Header — sertakan waktu babak */}
               <div className="text-center">
                 <p className="font-display font-bold uppercase text-[13px] tracking-wider" style={{ color: local.roundTitleColor }}>
                   Semifinal
@@ -373,6 +373,23 @@ export default function BracketStyleDialog({ style, onApply }: Props) {
                 <p className="text-[10px] mt-0.5" style={{ color: local.fontColorSecondary, opacity: 0.75 }}>
                   2 pertandingan
                 </p>
+                <div
+                  style={{
+                    fontFamily: "JetBrains Mono, monospace",
+                    fontSize: 11,
+                    color: local.roundTimeColor,
+                    background: local.matchboxBg,
+                    display: "inline-block",
+                    padding: "2px 10px",
+                    borderRadius: 999,
+                    marginTop: 5,
+                    whiteSpace: "nowrap",
+                    border: "1px solid",
+                    borderColor: local.matchboxBorder,
+                  }}
+                >
+                  08:00 – 10:30
+                </div>
               </div>
 
               {/* MatchBox tiruan */}
@@ -388,13 +405,13 @@ export default function BracketStyleDialog({ style, onApply }: Props) {
                   flex: "none",
                 }}
               >
-                {/* match-time */}
+                {/* match-time — sekarang pakai bg matchbox + border-bottom */}
                 <div
                   style={{
                     fontFamily: "JetBrains Mono, monospace",
                     fontSize: 11,
                     color: local.roundTimeColor,
-                    background: local.matchboxBorder,
+                    background: local.matchboxBg,
                     padding: "3px 10px",
                     textAlign: "center",
                     letterSpacing: "0.02em",
@@ -403,6 +420,8 @@ export default function BracketStyleDialog({ style, onApply }: Props) {
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
+                    borderBottom: "1px solid",
+                    borderBottomColor: local.matchboxBorder,
                   }}
                 >
                   <span style={{ fontWeight: 800 }}>#1</span>

@@ -511,6 +511,7 @@ export function generateMatchesForBracket(
   scheduleDays: Pick<ScheduleDay, "id" | "date" | "start_time_str" | "end_time_str" | "day_index">[] = [],
   roundAssignments: Pick<RoundAssignment, "round_number" | "schedule_day_id">[] = []
 ): { matches: MatchInsert[]; totalRounds: number; bracketSize: number; remainingCollisions: number } {
+  const thirdPlaceGapMinutes = bracket.third_place_gap_minutes ?? 0;
   const bracketSize = nextPowerOfTwo(participants.length);
   const totalRounds = Math.log2(bracketSize);
   const { slots, remainingCollisions } = arrangeSlotsAvoidingSameClub(participants, bracketSize);
@@ -566,14 +567,34 @@ export function generateMatchesForBracket(
       let waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
 
       // Jika ini babak final DAN ada pertandingan juara 3,
-      // geser final mundur setelah juara 3 selesai
+      // urutkan: semifinal > jeda > juara 3 > final
       if (r === totalRounds && totalRounds >= 2) {
-        // Juara 3 dimulai bersamaan dengan jadwal final asli
-        // Final dimundurkan: juara 3 + rest + final
-        const thirdPlaceShift =
-          bracket.match_duration_minutes + bracket.rest_duration_minutes;
-        waveStart = new Date(waveStart.getTime() + thirdPlaceShift * 60_000);
-        waveEnd = new Date(waveEnd.getTime() + thirdPlaceShift * 60_000);
+        // Juara 3 dimulai setelah semifinal selesai + jeda
+        const semiSchedule = schedule[totalRounds - 2];
+        const semiEnd = semiSchedule.end;
+        const thirdPlaceStart = new Date(semiEnd.getTime() + thirdPlaceGapMinutes * 60_000);
+        const thirdPlaceEnd = new Date(
+          thirdPlaceStart.getTime() + bracket.match_duration_minutes * 60_000
+        );
+
+        // Push juara 3 (match_index=1)
+        matches.push({
+          bracket_id: bracket.id,
+          round_number: totalRounds,
+          match_index: 1,
+          participant1_id: null,
+          participant2_id: null,
+          participant1_is_bye: false,
+          participant2_is_bye: false,
+          winner_id: null,
+          start_time: thirdPlaceStart.toISOString(),
+          end_time: thirdPlaceEnd.toISOString(),
+          is_third_place: true,
+        });
+
+        // Final langsung setelah juara 3 (tanpa jeda tambahan)
+        waveStart = new Date(thirdPlaceEnd.getTime());
+        waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
       }
 
       matches.push({
@@ -599,32 +620,6 @@ export function generateMatchesForBracket(
     currentIsBye = new Array(currentSlots.length).fill(false);
   }
 
-  // Tambah pertandingan perebutan juara 3 (jika minimal ada semifinal)
-  if (totalRounds >= 2) {
-    const semiSchedule = schedule[totalRounds - 2]; // jadwal semifinal
-    const finalSchedule = schedule[totalRounds - 1]; // jadwal final asli
-
-    // Juara 3 dimulai di waktu yang sama dengan jadwal final asli
-    const thirdPlaceStart = new Date(finalSchedule.start);
-    const thirdPlaceEnd = new Date(
-      thirdPlaceStart.getTime() + bracket.match_duration_minutes * 60_000
-    );
-
-    matches.push({
-      bracket_id: bracket.id,
-      round_number: totalRounds,
-      match_index: 1,
-      participant1_id: null,
-      participant2_id: null,
-      participant1_is_bye: false,
-      participant2_is_bye: false,
-      winner_id: null,
-      start_time: thirdPlaceStart.toISOString(),
-      end_time: thirdPlaceEnd.toISOString(),
-      is_third_place: true,
-    });
-  }
-
   return { matches, totalRounds, bracketSize, remainingCollisions };
 }
 
@@ -646,12 +641,13 @@ export function nextRoundTarget(matchIndex: number): {
  * Mendukung multi-hari (schedule_days + round_assignments) jika disediakan.
  */
 export function recomputeMatchTimes(
-  bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes" | "courts_count">,
+  bracket: Pick<Bracket, "start_time" | "match_duration_minutes" | "rest_duration_minutes" | "courts_count" | "third_place_gap_minutes">,
   matches: { id: string; round_number: number; match_index: number }[],
   breakTimes: Pick<BreakTime, "start_time_str" | "end_time_str">[] = [],
   scheduleDays: Pick<ScheduleDay, "id" | "date" | "start_time_str" | "end_time_str" | "day_index">[] = [],
   roundAssignments: Pick<RoundAssignment, "round_number" | "schedule_day_id">[] = []
 ): Map<string, { start_time: string; end_time: string }> {
+  const thirdPlaceGapMinutes = bracket.third_place_gap_minutes ?? 0;
   const totalRounds = Math.max(...matches.map((m) => m.round_number), 1);
   const bracketSize = Math.pow(2, totalRounds);
 
@@ -700,42 +696,65 @@ export function recomputeMatchTimes(
     // Hitung jumlah gelombang untuk pertandingan reguler di babak ini
     const regularWaves = Math.ceil(regularMatches.length / courts);
 
-    // Jika ada juara 3, final dimundurkan: juara 3 mulai duluan, final setelahnya
+    // Jika ada juara 3, jadwalkan setelah semifinal + jeda, final setelah juara 3
     const hasThirdPlace = thirdPlaceMatches.length > 0;
-    const finalShift = hasThirdPlace
-      ? bracket.match_duration_minutes + bracket.rest_duration_minutes
-      : 0;
+    const semiSchedule = hasThirdPlace ? roundScheduleMap.get(totalRounds - 1) : null;
 
-    // Hitung waktu mulai aktual setiap gelombang reguler
-    const waveStartTimes = computeWaveStartTimes(
-      new Date(roundSchedule.start.getTime() + finalShift * 60_000),
-      regularWaves,
-      bracket.match_duration_minutes,
-      bracket.rest_duration_minutes,
-      breakMins
-    );
-
-    for (const match of regularMatches) {
-      const wave = Math.floor(match.match_index / courts);
-      const waveStart = waveStartTimes[wave];
-      const waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
-
-      result.set(match.id, {
-        start_time: waveStart.toISOString(),
-        end_time: waveEnd.toISOString(),
-      });
-    }
-
-    // Pertandingan juara 3: dijadwalkan di awal slot babak final
-    for (const match of thirdPlaceMatches) {
-      const thirdPlaceStart = new Date(roundSchedule.start);
+    if (hasThirdPlace && semiSchedule) {
+      // Juara 3: mulai setelah semifinal selesai + jeda
+      const semiEnd = semiSchedule.end;
+      const thirdPlaceStart = new Date(semiEnd.getTime() + thirdPlaceGapMinutes * 60_000);
       const thirdPlaceEnd = new Date(
         thirdPlaceStart.getTime() + bracket.match_duration_minutes * 60_000
       );
-      result.set(match.id, {
-        start_time: thirdPlaceStart.toISOString(),
-        end_time: thirdPlaceEnd.toISOString(),
-      });
+
+      for (const match of thirdPlaceMatches) {
+        result.set(match.id, {
+          start_time: thirdPlaceStart.toISOString(),
+          end_time: thirdPlaceEnd.toISOString(),
+        });
+      }
+
+      // Final langsung setelah juara 3 (tanpa jeda tambahan)
+      const finalStart = new Date(thirdPlaceEnd.getTime());
+      const finalWaveStarts = computeWaveStartTimes(
+        finalStart,
+        regularWaves,
+        bracket.match_duration_minutes,
+        bracket.rest_duration_minutes,
+        breakMins
+      );
+
+      for (const match of regularMatches) {
+        const wave = Math.floor(match.match_index / courts);
+        const waveStart = finalWaveStarts[wave];
+        const waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
+
+        result.set(match.id, {
+          start_time: waveStart.toISOString(),
+          end_time: waveEnd.toISOString(),
+        });
+      }
+    } else {
+      // Tidak ada juara 3 — jadwal normal
+      const waveStartTimes = computeWaveStartTimes(
+        new Date(roundSchedule.start),
+        regularWaves,
+        bracket.match_duration_minutes,
+        bracket.rest_duration_minutes,
+        breakMins
+      );
+
+      for (const match of regularMatches) {
+        const wave = Math.floor(match.match_index / courts);
+        const waveStart = waveStartTimes[wave];
+        const waveEnd = new Date(waveStart.getTime() + bracket.match_duration_minutes * 60_000);
+
+        result.set(match.id, {
+          start_time: waveStart.toISOString(),
+          end_time: waveEnd.toISOString(),
+        });
+      }
     }
   }
 

@@ -555,6 +555,7 @@ export async function updateBracketScheduleAction(
   const matchDuration = Number(formData.get("match_duration_minutes"));
   const restDuration = Number(formData.get("rest_duration_minutes"));
   const courtsCount = Number(formData.get("courts_count") ?? 1);
+  const thirdPlaceGap = Number(formData.get("third_place_gap_minutes") ?? 0);
   const breakCount = Number(formData.get("break_count") ?? 0);
   const dayCount = Number(formData.get("day_count") ?? 1);
 
@@ -566,6 +567,9 @@ export async function updateBracketScheduleAction(
   }
   if (!Number.isFinite(courtsCount) || courtsCount < 1) {
     return { error: "Jumlah lapangan minimal 1." };
+  }
+  if (!Number.isFinite(thirdPlaceGap) || thirdPlaceGap < 0) {
+    return { error: "Jeda juara 3 harus berupa angka 0 atau lebih." };
   }
   if (!Number.isFinite(dayCount) || dayCount < 1) {
     return { error: "Minimal 1 hari pelaksanaan." };
@@ -629,6 +633,7 @@ export async function updateBracketScheduleAction(
       match_duration_minutes: matchDuration,
       rest_duration_minutes: restDuration,
       courts_count: courtsCount,
+      third_place_gap_minutes: thirdPlaceGap,
     })
     .eq("id", bracketId);
 
@@ -797,6 +802,7 @@ export async function updateBracketScheduleAction(
         match_duration_minutes: matchDuration,
         rest_duration_minutes: restDuration,
         courts_count: courtsCount,
+        third_place_gap_minutes: thirdPlaceGap,
       },
       existingMatches,
       breakTimes,
@@ -957,6 +963,7 @@ export async function updateRoundAssignmentsAction(
         match_duration_minutes: bracket.match_duration_minutes,
         rest_duration_minutes: bracket.rest_duration_minutes,
         courts_count: bracket.courts_count,
+        third_place_gap_minutes: bracket.third_place_gap_minutes,
       },
       existingMatches,
       breakTimes ?? [],

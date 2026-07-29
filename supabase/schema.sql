@@ -44,6 +44,7 @@ create table if not exists brackets (
   match_duration_minutes int not null default 20,
   rest_duration_minutes int not null default 15,
   courts_count int not null default 1,
+  third_place_gap_minutes int not null default 0,
   status text not null default 'draft', -- draft | generated
   share_token uuid unique default gen_random_uuid(),
   created_at timestamptz not null default now()
@@ -179,6 +180,12 @@ alter table activity_logs enable row level security;
 -- MIGRASI: Tambah kolom is_third_place untuk fitur perebutan juara 3
 -- ---------------------------------------------------------
 -- alter table matches add column if not exists is_third_place boolean not null default false;
+
+-- ---------------------------------------------------------
+-- MIGRASI: Tambah kolom third_place_gap_minutes untuk jeda
+-- pertandingan perebutan juara 3 sebelum final
+-- ---------------------------------------------------------
+-- alter table brackets add column if not exists third_place_gap_minutes int not null default 0;
 
 -- ---------------------------------------------------------
 -- bracket_styles: template kustom warna bracket yang disimpan

@@ -18,6 +18,7 @@ export async function createBracketAction(_prevState: ActionState, formData: For
   const matchDuration = Number(formData.get("match_duration_minutes"));
   const restDuration = Number(formData.get("rest_duration_minutes"));
   const courtsCount = Number(formData.get("courts_count") ?? 1);
+  const thirdPlaceGap = Number(formData.get("third_place_gap_minutes") ?? 0);
   const breakCount = Number(formData.get("break_count") ?? 0);
   const dayCount = Number(formData.get("day_count") ?? 1);
 
@@ -30,6 +31,9 @@ export async function createBracketAction(_prevState: ActionState, formData: For
   }
   if (!Number.isFinite(courtsCount) || courtsCount < 1) {
     return { error: "Jumlah lapangan minimal 1." };
+  }
+  if (!Number.isFinite(thirdPlaceGap) || thirdPlaceGap < 0) {
+    return { error: "Jeda juara 3 harus berupa angka 0 atau lebih." };
   }
   if (!Number.isFinite(dayCount) || dayCount < 1) {
     return { error: "Minimal 1 hari pelaksanaan." };
@@ -94,6 +98,7 @@ export async function createBracketAction(_prevState: ActionState, formData: For
       match_duration_minutes: matchDuration,
       rest_duration_minutes: restDuration,
       courts_count: courtsCount,
+      third_place_gap_minutes: thirdPlaceGap,
     })
     .select("id")
     .single();

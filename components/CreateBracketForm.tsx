@@ -136,7 +136,7 @@ export default function CreateBracketForm({
 
       <input type="hidden" name="day_count" value={days.length} autoComplete="off" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div>
           <Label htmlFor="match_duration_minutes" className="mb-1.5 block text-ink-700">
             Durasi tiap Babak (menit)
@@ -181,6 +181,24 @@ export default function CreateBracketForm({
             defaultValue={defaultCourtsCount}
             className="bg-court-50"
           />
+        </div>
+        <div>
+          <Label htmlFor="third_place_gap_minutes" className="mb-1.5 block text-ink-700">
+            Jeda Semifinal ke Juara 3 (menit)
+          </Label>
+          <Input
+            id="third_place_gap_minutes"
+            name="third_place_gap_minutes"
+            type="number"
+            min={0}
+            required
+            disabled={pending}
+            defaultValue={0}
+            className="bg-court-50"
+          />
+          <p className="text-[10px] text-ink-400 mt-0.5 leading-tight">
+            Jarak antara selesai semifinal dengan mulai pertandingan juara 3.
+          </p>
         </div>
       </div>
 

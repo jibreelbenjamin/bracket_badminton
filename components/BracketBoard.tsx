@@ -108,11 +108,18 @@ export default function BracketBoard({
 
   const participantMap = useMemo(() => new Map(participants.map((p) => [p.id, p])), [participants]);
 
-  // Hitung nomor pertandingan global (diurut berdasarkan round_number lalu match_index)
+  // Hitung nomor pertandingan global: semifinal > perebutan juara 3 > final
   const matchNumberMap = useMemo(() => {
     const map = new Map<string, number>();
     let counter = 1;
-    for (const m of matches) {
+    // Urutkan: third place (is_third_place=true) sebelum final reguler di babak yang sama
+    const sorted = [...matches].sort((a, b) => {
+      if (a.round_number !== b.round_number) return a.round_number - b.round_number;
+      if (a.is_third_place && !b.is_third_place) return -1;
+      if (!a.is_third_place && b.is_third_place) return 1;
+      return a.match_index - b.match_index;
+    });
+    for (const m of sorted) {
       map.set(m.id, counter++);
     }
     return map;
@@ -143,9 +150,6 @@ export default function BracketBoard({
     : null;
   const thirdPlaceP2 = thirdPlaceMatch?.participant2_id
     ? participantMap.get(thirdPlaceMatch.participant2_id) ?? null
-    : null;
-  const thirdPlaceWinner = thirdPlaceMatch?.winner_id
-    ? participantMap.get(thirdPlaceMatch.winner_id) ?? null
     : null;
 
   async function getFontEmbedCSS(): Promise<string> {
@@ -343,42 +347,31 @@ export default function BracketBoard({
                       );
                     })}
 
-                  {/* Pertandingan Perebutan Juara 3 — di atas pertandingan Semifinal */}
+                  {/* Pertandingan Perebutan Juara 3 — di tengah antara pertandingan Semifinal */}
                   {isSemifinal && thirdPlaceMatch && (() => {
-                    const firstMatchTop = spacing * 0.5 - BOX_HEIGHT / 2;
-                    // Posisi dari atas round-body, pastikan tidak negatif
-                    const thirdPlaceTop = Math.max(6, firstMatchTop - BOX_HEIGHT - 210);
+                    // Posisikan di tengah-tengah antar semifinal
+                    const thirdPlaceCenter = totalHeight / 2;
+                    const thirdPlaceTop = thirdPlaceCenter - BOX_HEIGHT / 2;
                     const thirdPlaceBottom = thirdPlaceTop + BOX_HEIGHT;
                     return (
                       <>
                         {/* Garis pemisah putus-putus */}
                         <div
                           className="absolute left-0 right-10 border-t-2 border-dashed border-amber-300/60"
-                          style={{ top: Math.max(0, thirdPlaceTop - 35) }}
+                          style={{ top: thirdPlaceTop - 55 }}
                         />
                         {/* Label badge */}
                         <div
                           className="absolute left-0 flex justify-center"
-                          style={{ top: Math.max(2, thirdPlaceTop - 16) }}
+                          style={{ top: thirdPlaceTop - 30 }}
                         >
                           <div className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-300 rounded-lg px-3 py-0.5 shadow-sm">
-                            <span className="text-xs">🥉</span>
+                            {/* <span className="text-xs">🥉</span> */}
                             <span className="text-nowrap text-[10px] font-bold text-amber-800 tracking-wide">
                               Perebutan Juara 3
                             </span>
                           </div>
                         </div>
-                        {/* Info waktu */}
-                        {/* {thirdPlaceMatch.start_time && thirdPlaceMatch.end_time && (
-                          <div
-                            className="absolute left-0 right-0 text-center"
-                            style={{ top: thirdPlaceTop + 10 }}
-                          >
-                            <span className="text-[10px] text-ink-400">
-                              {formatTime(thirdPlaceMatch.start_time)} – {formatTime(thirdPlaceMatch.end_time)}
-                            </span>
-                          </div>
-                        )} */}
                         {/* Kotak pertandingan */}
                         <MatchBox
                           bracketId={bracket.id}
@@ -386,32 +379,13 @@ export default function BracketBoard({
                           p1={thirdPlaceP1}
                           p2={thirdPlaceP2}
                           style={{
-                            top: thirdPlaceTop + 14,
+                            top: thirdPlaceTop,
                             height: BOX_HEIGHT,
                           }}
                           readonly={readonly}
                           matchNumber={matchNumberMap.get(thirdPlaceMatch.id)}
                           courtsCount={bracket.courts_count}
                         />
-                        {/* Label pemenang */}
-                        {/* {thirdPlaceWinner && (
-                          <div
-                            className="absolute left-0 right-0 flex justify-center"
-                            style={{ top: thirdPlaceBottom + 4 }}
-                          >
-                            <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-0.5 shadow-sm">
-                              <span className="text-[10px]">🥉</span>
-                              <span className="text-[10px] font-bold text-amber-800">
-                                {thirdPlaceWinner.name}
-                              </span>
-                              {thirdPlaceWinner.club_name && (
-                                <span className="text-[9px] text-ink-400">
-                                  · {thirdPlaceWinner.club_name}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )} */}
                       </>
                     );
                   })()}
