@@ -84,4 +84,32 @@ export type RoundAssignment = {
   created_at: string;
 };
 
+export type BracketStyle = {
+  title: string;
+  matchboxBg: string;
+  matchboxBorder: string;
+  lineColor: string;
+  fontColorPrimary: string;
+  fontColorSecondary: string;
+  fontColorAccent: string;
+  bgColor: string;
+  courtTextColor: string;
+  roundTitleColor: string;
+  roundTimeColor: string;
+};
+
+export const DEFAULT_BRACKET_STYLE: BracketStyle = {
+  title: "",
+  matchboxBg: "#f2f9f7",
+  matchboxBorder: "#dbeee9",
+  lineColor: "#bfe0d8",
+  fontColorPrimary: "#16221f",
+  fontColorSecondary: "#5b6b67",
+  fontColorAccent: "#185f52",
+  bgColor: "#ffffff",
+  courtTextColor: "#9c6708",
+  roundTitleColor: "#185f52",
+  roundTimeColor: "#185f52",
+};
+
 export type ActionState = { error?: string; success?: string } | undefined;

@@ -179,3 +179,24 @@ alter table activity_logs enable row level security;
 -- MIGRASI: Tambah kolom is_third_place untuk fitur perebutan juara 3
 -- ---------------------------------------------------------
 -- alter table matches add column if not exists is_third_place boolean not null default false;
+
+-- ---------------------------------------------------------
+-- bracket_styles: template kustom warna bracket yang disimpan
+-- ---------------------------------------------------------
+create table if not exists bracket_styles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  matchbox_bg text not null,
+  matchbox_border text not null,
+  line_color text not null,
+  font_color_primary text not null,
+  font_color_secondary text not null,
+  font_color_accent text not null,
+  bg_color text not null,
+  court_text_color text not null,
+  round_title_color text not null,
+  round_time_color text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table bracket_styles enable row level security;

@@ -5,11 +5,13 @@ import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { Loader2, Maximize2, Minimize2, Trophy } from "lucide-react";
 import { roundLabel } from "@/lib/bracket-logic";
-import type { Bracket, MatchRow, Participant, ScheduleDay, RoundAssignment } from "@/lib/types";
+import type { Bracket, MatchRow, Participant, ScheduleDay, RoundAssignment, BracketStyle } from "@/lib/types";
+import { DEFAULT_BRACKET_STYLE } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import MatchBox from "./MatchBox";
 import ShareBracketButton from "./ShareBracketButton";
 import WinnerDialog, { type WinnerDialogHandle } from "./WinnerDialog";
+import BracketStyleDialog from "./BracketStyleDialog";
 import { useBracketLoading } from "./BracketLoadingProvider";
 
 const MATCH_HEIGHT = 96; // jarak vertikal antar pertandingan di babak 1 (px)
@@ -37,6 +39,7 @@ export default function BracketBoard({
   const winnerDialogRef = useRef<WinnerDialogHandle>(null);
   const [exporting, setExporting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [bracketStyle, setBracketStyle] = useState<BracketStyle>(DEFAULT_BRACKET_STYLE);
   const { isBracketLoading } = useBracketLoading();
 
   // Build round → day lookup: dari explicit assignments + auto-detect dari match time
@@ -204,6 +207,9 @@ export default function BracketBoard({
             <ShareBracketButton bracketId={bracket.id} currentShareToken={bracket.share_token} />
           )}
           {!isFullscreen && (
+            <BracketStyleDialog style={bracketStyle} onApply={setBracketStyle} />
+          )}
+          {!isFullscreen && (
             <Button
               onClick={handleExport}
               disabled={exporting}
@@ -248,7 +254,28 @@ export default function BracketBoard({
           </div>
         )}
 
-        <div ref={exportRef} className="bracket-export">
+        <div
+          ref={exportRef}
+          className="bracket-export"
+          style={{
+            paddingTop: bracketStyle.title ? 72 : 36,
+            background: bracketStyle.bgColor,
+            "--br-matchbox-bg": bracketStyle.matchboxBg,
+            "--br-matchbox-border": bracketStyle.matchboxBorder,
+            "--br-line-color": bracketStyle.lineColor,
+            "--br-font-primary": bracketStyle.fontColorPrimary,
+            "--br-font-secondary": bracketStyle.fontColorSecondary,
+            "--br-font-accent": bracketStyle.fontColorAccent,
+            "--br-court-text": bracketStyle.courtTextColor,
+            "--br-round-title-color": bracketStyle.roundTitleColor,
+            "--br-round-time-color": bracketStyle.roundTimeColor,
+          } as React.CSSProperties}
+        >
+          {bracketStyle.title && (
+            <div className="bracket-title-wrapper">
+              <h1 className="bracket-title">{bracketStyle.title}</h1>
+            </div>
+          )}
           {Array.from({ length: totalRounds }, (_, i) => i + 1).map((roundNum) => {
             const roundMatches = roundsMap.get(roundNum) ?? [];
             const spacing = MATCH_HEIGHT * Math.pow(2, roundNum - 1);

@@ -86,11 +86,43 @@ h3,
    ========================================================= */
 
 .bracket-export {
-  background: #ffffff;
+  position: relative;
   display: inline-flex;
   align-items: flex-start;
   padding: 36px 44px;
   border-radius: 24px;
+  /* Custom style variables with defaults */
+  --br-matchbox-bg: var(--color-court-50);
+  --br-matchbox-border: var(--color-court-100);
+  --br-line-color: var(--color-court-200);
+  --br-font-primary: var(--color-ink-900);
+  --br-font-secondary: var(--color-ink-500);
+  --br-font-accent: var(--color-court-700);
+  --br-court-text: var(--color-cork-600);
+  --br-round-title-color: var(--color-court-800);
+  --br-round-time-color: var(--color-court-700);
+}
+
+.court-text {
+  color: var(--br-court-text);
+}
+
+.bracket-title-wrapper {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 0 44px;
+}
+
+.bracket-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--br-font-primary);
+  margin: 0;
+  letter-spacing: 0.02em;
 }
 
 .bracket-round {
@@ -105,7 +137,7 @@ h3,
   left: -20px;
   top: 0;
   bottom: 0;
-  border-left: 1.5px dashed var(--color-court-200);
+  border-left: 1.5px dashed var(--br-line-color);
 }
 
 .round-header {
@@ -120,26 +152,28 @@ h3,
   font-size: 13px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-court-800);
+  color: var(--br-round-title-color);
 }
 
 .round-match-count {
   font-size: 10px;
-  color: var(--color-ink-400);
+  color: var(--br-font-secondary);
   margin-top: 2px;
+  opacity: 0.75;
 }
 
 .round-day {
   font-size: 10px;
-  color: var(--color-court-600);
+  color: var(--br-round-title-color);
   margin-top: 2px;
+  opacity: 0.8;
 }
 
 .round-time {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-cork-500);
-  background: var(--color-cork-100);
+  color: var(--br-round-time-color);
+  background: var(--br-matchbox-border);
   display: inline-block;
   padding: 2px 10px;
   border-radius: 999px;
@@ -156,8 +190,8 @@ h3,
   left: 0;
   width: 220px;
   height: 84px;
-  background: var(--color-court-50);
-  border: 1.5px solid var(--color-court-100);
+  background: var(--br-matchbox-bg);
+  border: 1.5px solid var(--br-matchbox-border);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -198,8 +232,8 @@ h3,
 .match-time {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-court-700);
-  background: var(--color-court-100);
+  color: var(--br-round-time-color);
+  background: var(--br-matchbox-border);
   padding: 3px 10px;
   text-align: center;
   letter-spacing: 0.02em;
@@ -217,7 +251,7 @@ h3,
   justify-content: center;
   height: 33px;
   padding: 0 12px;
-  border-top: 1px solid var(--color-court-100);
+  border-top: 1px solid var(--br-matchbox-border);
   border-left: none;
   text-align: left;
   background: transparent;
@@ -245,13 +279,13 @@ button.player-row:not(:disabled):hover {
 .player-name {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--color-ink-900);
+  color: var(--br-font-primary);
 }
 
 .player-club {
   font-size: 10px;
   margin: -4px 0 0 0;
-  color: var(--color-ink-500);
+  color: var(--br-font-secondary);
 }
 
 .player-row.winner {
@@ -259,7 +293,7 @@ button.player-row:not(:disabled):hover {
 }
 
 .player-row.winner .player-name {
-  color: var(--color-court-800);
+  color: var(--br-font-accent);
 }
 
 .player-row.winner .player-name::after {
@@ -267,7 +301,7 @@ button.player-row:not(:disabled):hover {
 }
 
 .player-row.bye .player-name {
-  color: var(--color-ink-500);
+  color: var(--br-font-secondary);
   font-weight: 700;
   letter-spacing: 0.1em;
   font-size: 10.5px;
@@ -277,9 +311,9 @@ button.player-row:not(:disabled):hover {
   position: absolute;
   left: 220px;
   width: 40px;
-  border-top: 2px solid var(--color-court-200);
-  border-bottom: 2px solid var(--color-court-200);
-  border-right: 2px solid var(--color-court-200);
+  border-top: 2px solid var(--br-line-color);
+  border-bottom: 2px solid var(--br-line-color);
+  border-right: 2px solid var(--br-line-color);
   border-radius: 0 8px 8px 0;
   pointer-events: none;
 }

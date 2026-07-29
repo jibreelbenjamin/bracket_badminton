@@ -77,11 +77,11 @@ export default function MatchBox({
     >
       <div className="match-time">
         {match.start_time && match.end_time
-          ? <>{matchNumber != null ? <span className="font-extrabold">#{matchNumber}</span> : null}{courtNumber != null ? <span className="text-cork-600 font-bold"> L{courtNumber}</span> : null} {matchNumber != null ? <span className="mx-0.5">·</span> : null} {formatDate(match.start_time)}, {formatTime(match.start_time)}-{formatTime(match.end_time)}</>
+          ? <>{matchNumber != null ? <span className="font-extrabold">#{matchNumber}</span> : null}{courtNumber != null ? <span className="court-text font-bold"> L{courtNumber}</span> : null} {matchNumber != null ? <span className="mx-0.5">·</span> : null} {formatDate(match.start_time)}, {formatTime(match.start_time)}-{formatTime(match.end_time)}</>
           : matchNumber != null
-            ? <><span className="font-bold">#{matchNumber}</span>{courtNumber != null ? <span className="text-cork-600 font-bold ml-1">L{courtNumber}</span> : null}</>
+            ? <><span className="font-bold">#{matchNumber}</span>{courtNumber != null ? <span className="court-text font-bold ml-1">L{courtNumber}</span> : null}</>
             : courtNumber != null
-              ? <span className="text-cork-600 font-bold">Lapangan {courtNumber}</span>
+              ? <span className="court-text font-bold">Lapangan {courtNumber}</span>
               : null}
       </div>
       {isPending && (
