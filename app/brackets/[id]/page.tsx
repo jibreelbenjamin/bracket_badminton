@@ -6,7 +6,7 @@ import type { Bracket, BreakTime, MatchRow, Participant, ScheduleDay, RoundAssig
 import ImportParticipantsForm from "@/components/ImportParticipantsForm";
 import ParticipantsTable from "@/components/ParticipantsTable";
 import GenerateBracketButton from "@/components/GenerateBracketButton";
-import BracketBoard from "@/components/BracketBoard";
+import BracketLiveView from "@/components/BracketLiveView";
 import ScheduleEditor from "@/components/ScheduleEditor";
 import BracketNameEditor from "@/components/BracketNameEditor";
 import ParticipantChangeAlert from "@/components/ParticipantChangeAlert";
@@ -206,12 +206,13 @@ export default async function BracketDetailPage({ params }: { params: Promise<{ 
         </section>
 
         {matchList.length > 0 ? (
-          <BracketBoard
+          <BracketLiveView
             bracket={bracket}
             matches={matchList}
             participants={participantList}
             scheduleDays={scheduleDayList}
             roundAssignments={roundAssignmentList}
+            liveUrl={`/brackets/${id}/live`}
           />
         ) : (
           <div className="text-center py-16 border-2 border-dashed border-court-200 rounded-2xl">

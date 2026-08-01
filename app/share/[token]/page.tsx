@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log";
 import type { Bracket, BreakTime, MatchRow, Participant, ScheduleDay, RoundAssignment } from "@/lib/types";
-import BracketBoard from "@/components/BracketBoard";
+import BracketLiveView from "@/components/BracketLiveView";
 
 export const dynamic = "force-dynamic";
 
@@ -114,13 +114,14 @@ export default async function SharedBracketPage({ params }: { params: Promise<{ 
       </div>
 
       {matchList.length > 0 ? (
-        <BracketBoard
+        <BracketLiveView
           bracket={bracket}
           matches={matchList}
           participants={participantList}
           scheduleDays={scheduleDayList}
           roundAssignments={roundAssignmentList}
           readonly
+          liveUrl={`/brackets/${bracket.id}/live?share_token=${token}`}
         />
       ) : (
         <div className="text-center py-16 border-2 border-dashed border-court-200 rounded-2xl">
